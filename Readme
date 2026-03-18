@@ -1,0 +1,175 @@
+🧠 RAG-Docs
+
+Upload any PDF. Ask anything. Get answers grounded in your document — not hallucinated.
+
+
+📌 What is RAG-Docs?
+RAG-Docs is an AI-powered document chatbot built from scratch. Upload any PDF and have a real conversation with it. It uses Retrieval-Augmented Generation (RAG) to find the most relevant parts of your document and generate accurate answers — never making things up.
+
+🎬 Demo
+ ┌──────────────────────────────────────────────────┐
+ │  🧠 RAG-Docs                                      │
+ │  ─────────────────────────────────────────────── │
+ │  📄  Upload a PDF        [Choose file]            │
+ │  ✅  Ready! 42 chunks indexed from 10 pages       │
+ │  ─────────────────────────────────────────────── │
+ │                                                   │
+ │  🧑  What is this document about?                 │
+ │                                                   │
+ │  🤖  This document covers the fundamentals of    │
+ │      electronic circuits including Ohm's Law,    │
+ │      resistors, capacitors and signal analysis.  │
+ │                                                   │
+ │  🧑  Explain Ohm's Law in simple words           │
+ │                                                   │
+ │  🤖  Ohm's Law states that the current through   │
+ │      a conductor is proportional to the voltage  │
+ │      across it — V = I × R.                      │
+ │                                                   │
+ │  ▶ Type your question here...          [Send]    │
+ └──────────────────────────────────────────────────┘
+
+⚙️ How it works
+                        ┌─────────────────────────────────┐
+                        │           YOUR PDF               │
+                        └────────────────┬────────────────┘
+                                         │
+                                         ▼
+                        ┌─────────────────────────────────┐
+                        │      EXTRACT TEXT (PyMuPDF)      │
+                        └────────────────┬────────────────┘
+                                         │
+                                         ▼
+                        ┌─────────────────────────────────┐
+                        │   SPLIT INTO 500-WORD CHUNKS     │
+                        │   chunk_0  chunk_1  chunk_2 ...  │
+                        └────────────────┬────────────────┘
+                                         │
+                                         ▼
+                        ┌─────────────────────────────────┐
+                        │   EMBED CHUNKS → VECTORS         │
+                        │   [0.23, 0.87, 0.12, 0.45...]   │
+                        │   sentence-transformers          │
+                        └────────────────┬────────────────┘
+                                         │
+                                         ▼
+                        ┌─────────────────────────────────┐
+                        │   STORE IN CHROMADB (on disk)    │
+                        │   vector + original text saved   │
+                        └─────────────────────────────────┘
+
+
+  ─────────────────────── AT QUERY TIME ───────────────────────
+
+
+  ┌─────────────┐     embed      ┌──────────────┐
+  │  User asks  │ ────────────▶  │   Question   │
+  │  question   │                │   as vector  │
+  └─────────────┘                └──────┬───────┘
+                                         │
+                                         ▼
+                        ┌─────────────────────────────────┐
+                        │  SIMILARITY SEARCH IN CHROMADB   │
+                        │  finds top 3 closest chunks      │
+                        └────────────────┬────────────────┘
+                                         │
+                                         ▼
+                        ┌─────────────────────────────────┐
+                        │   BUILD PROMPT                   │
+                        │   context (3 chunks) + question  │
+                        └────────────────┬────────────────┘
+                                         │
+                                         ▼
+                        ┌─────────────────────────────────┐
+                        │   GROQ → LLaMA 3.3 70B           │
+                        │   generates grounded answer      │
+                        └────────────────┬────────────────┘
+                                         │
+                                         ▼
+                        ┌─────────────────────────────────┐
+                        │   ANSWER SHOWN IN CHAT UI      │
+                        └─────────────────────────────────┘
+
+🛠️ Tech Stack
+┌─────────────────────────────────────────────────────┐
+│                    RAG-Docs Stack                    │
+├──────────────────┬──────────────────────────────────┤
+│  UI              │  Streamlit                        │
+│  LLM             │  LLaMA 3.3 70B (via Groq API)    │
+│  Embeddings      │  all-MiniLM-L6-v2                 │
+│  Vector DB       │  ChromaDB (local persistent)      │
+│  PDF Parser      │  PyMuPDF (fitz)                   │
+│  Language        │  Python 3.10+                     │
+│  Cost            │  100% FREE ✅                     │
+└──────────────────┴──────────────────────────────────┘
+
+📁 Project Structure
+RAG-Docs/
+│
+├── app.py                 ← Streamlit web app (main file)
+├── ingest.py              ← standalone PDF ingestion script
+├── chat.py                ← standalone CLI chat script
+├── requirements.txt       ← all dependencies
+├── .gitignore             ← ignores venv, chroma_db etc.
+├── README.md              ← you are here
+│
+└── chroma_db/             ← auto-created vector database
+    └── chroma.sqlite3     ← your vectors stored here
+
+🚀 Getting Started
+1. Clone the repo
+bashgit clone https://github.com/Arpitt-19/RAG-Docs.git
+cd RAG-Docs
+2. Create virtual environment
+bash# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# Mac/Linux
+python -m venv venv
+source venv/bin/activate
+3. Install dependencies
+bashpip install -r requirements.txt
+4. Add your Groq API key
+Get a free key at  https://console.groq.com
+Open app.py and replace:
+pythongroq_client = Groq(api_key="YOUR_GROQ_KEY_HERE")
+5. Run the app
+bashstreamlit run app.py
+Open your browser at http://localhost:8501 
+
+💡 Example Questions to Try
+✅ "Summarize this document in 3 bullet points"
+✅ "What are the main topics covered?"
+✅ "Explain [concept] from the document"
+✅ "What does the document say about [topic]?"
+✅ "List all the key points from chapter 2"
+
+🧠 Why RAG and not just sending the whole PDF?
+❌ Without RAG:
+   Send 100 pages to AI → wastes tokens → slow → expensive
+   AI might hallucinate because context is too large
+
+✅ With RAG:
+   Find only the 3 most relevant paragraphs → send those
+   AI answers from exact source → accurate → fast → free
+RAG = giving the AI only the pages it needs, not the whole library.
+
+🔮 Future Improvements
+
+ Support multiple PDFs simultaneously
+ Show source page numbers for each answer
+ Export chat history
+ Support .txt and .docx files
+ Deploy on Streamlit Cloud
+ Add authentication for private documents
+
+
+👤 Author
+Arpit Shinde
+
+📄 License
+MIT License — free to use, modify and distribute.
+
+
+Built this from scratch — every line understood, not copy-pasted.
