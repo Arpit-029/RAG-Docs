@@ -7,6 +7,16 @@ import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min?url"
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
+// ─── API KEY RESOLUTION ───────────────────────────────────────────────────────
+// Priority: 1) VITE_GROQ_KEY env var (set in .env or deployment dashboard)
+//           2) localStorage (manual entry fallback)
+function resolveInitialKey() {
+  const envKey = import.meta.env.VITE_GROQ_KEY
+  if (envKey && envKey.trim()) return envKey.trim()
+  return localStorage.getItem("dm_groq_key") || ""
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // split text into overlapping chunks
 function chunkText(text, size = 400, overlap = 60) {
   const words = text.split(/\s+/).filter(Boolean)
@@ -20,7 +30,6 @@ function chunkText(text, size = 400, overlap = 60) {
 }
 
 // basic keyword scoring to find relevant chunks
-// not as good as embeddings but works fine for most cases
 function scoreChunk(chunk, query) {
   const qwords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2)
   const lower = chunk.toLowerCase()
@@ -40,7 +49,6 @@ function getTopChunks(chunks, query, n = 5) {
     .map(x => x.c)
 }
 
-// groq api call - using openai compatible endpoint
 async function callGroq(key, messages, maxTokens = 1500) {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -75,11 +83,13 @@ const modePrompts = {
   "🔍 Deep": "Give a detailed analytical response with nuance.",
 }
 
+// Whether the key came from env (if so, hide the key management UI)
+const ENV_KEY_ACTIVE = !!(import.meta.env.VITE_GROQ_KEY?.trim())
+
 export default function App() {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("dm_groq_key") || "")
+  const [apiKey, setApiKey] = useState(resolveInitialKey)
   const [keyDraft, setKeyDraft] = useState("")
 
-  // list of loaded docs: { name, chunks, pages, summary }
   const [docs, setDocs] = useState([])
   const [activeDoc, setActiveDoc] = useState(null)
 
@@ -140,10 +150,7 @@ export default function App() {
         }], 400)
 
         const newDoc = { name: file.name, chunks, pages, summary }
-        setDocs(prev => {
-          const updated = [...prev, newDoc]
-          return updated
-        })
+        setDocs(prev => [...prev, newDoc])
         setActiveDoc(file.name)
         setMessages([])
         setChips([])
@@ -168,7 +175,6 @@ export default function App() {
     setLoading(true)
 
     try {
-      // blend recent history into query for better chunk retrieval
       const recentText = updated.slice(-5).map(m => m.content).join(" ")
       const topChunks = getTopChunks(doc.chunks, `${recentText} ${text}`)
       const ctx = topChunks.map((c, i) => `[${i + 1}]: ${c}`).join("\n\n---\n\n")
@@ -181,8 +187,6 @@ Rules:
 - If the topic isn't in the context, say so but still try to be helpful.
 - Don't make stuff up.`
 
-      // build message history for groq
-      // inject context into the last user message only
       const groqMsgs = [
         { role: "system", content: sys },
         ...updated.slice(-20, -1).map(m => ({ role: m.role, content: m.content })),
@@ -192,7 +196,6 @@ Rules:
       const reply = await callGroq(apiKey, groqMsgs)
       setMessages(prev => [...prev, { role: "assistant", content: reply, sources: topChunks }])
 
-      // fire off followup suggestions without blocking
       callGroq(apiKey, [{
         role: "user",
         content: `Give 3 short follow-up questions as a JSON array. Nothing else.\nQ: ${text}\nA: ${reply.slice(0, 300)}\nFormat: ["q1?","q2?","q3?"]`
@@ -200,9 +203,7 @@ Rules:
         try {
           const parsed = JSON.parse(raw.slice(raw.indexOf("["), raw.lastIndexOf("]") + 1))
           setChips(parsed)
-        } catch {
-          // doesn't matter if this fails
-        }
+        } catch { /* ignore */ }
       }).catch(() => {})
 
     } catch (err) {
@@ -223,7 +224,7 @@ Rules:
     }
   }
 
-  // ---------- API KEY SCREEN ----------
+  // ---------- API KEY SCREEN (only shown if no env key and no saved key) ----------
   if (!apiKey) {
     return (
       <div style={S.page}>
@@ -267,13 +268,21 @@ Rules:
             <span style={S.logo}>🧠 DocMind</span>
             <span style={S.logoSub}>chat with PDFs</span>
           </div>
-          <button
-            style={S.iconBtn}
-            title="Change API key"
-            onClick={() => { if (confirm("Reset API key?")) { localStorage.removeItem("dm_groq_key"); setApiKey("") }}}
-          >
-            🔑
-          </button>
+          {/* Only show key reset button if NOT using env key */}
+          {!ENV_KEY_ACTIVE && (
+            <button
+              style={S.iconBtn}
+              title="Change API key"
+              onClick={() => {
+                if (confirm("Reset API key?")) {
+                  localStorage.removeItem("dm_groq_key")
+                  setApiKey("")
+                }
+              }}
+            >
+              🔑
+            </button>
+          )}
         </div>
 
         {/* upload drop zone */}
@@ -298,7 +307,7 @@ Rules:
           }
         </div>
 
-        {/* doc tabs if multiple docs loaded */}
+        {/* doc tabs */}
         {docs.length > 0 && (
           <div style={S.tabRow}>
             {docs.map(d => (
@@ -313,7 +322,7 @@ Rules:
           </div>
         )}
 
-        {/* controls - only show when a doc is loaded */}
+        {/* controls */}
         {currentDoc && (
           <div style={S.controls}>
             <select
@@ -374,17 +383,16 @@ Rules:
         {/* summary panel */}
         {showSummary && currentDoc && (
           <div style={S.summaryPanel}>
-            <div style={S.summaryHead}>📋 {currentDoc.name} · {currentDoc.pages}p · {currentDoc.chunks} chunks</div>
+            <div style={S.summaryHead}>📋 {currentDoc.name} · {currentDoc.pages}p · {currentDoc.chunks.length} chunks</div>
             <div style={{ fontSize: "0.82rem", lineHeight: "1.7", whiteSpace: "pre-wrap", color: "#c0cce0" }}>
               {currentDoc.summary}
             </div>
           </div>
         )}
 
-        {/* divider */}
         {currentDoc && <div style={S.divider} />}
 
-        {/* chat messages area */}
+        {/* chat area */}
         <div style={S.chatArea}>
           {!currentDoc && (
             <div style={S.empty}>
@@ -440,7 +448,7 @@ Rules:
           <div ref={bottomRef} />
         </div>
 
-        {/* input — fixed to bottom */}
+        {/* input bar */}
         {currentDoc && (
           <div style={S.inputBar}>
             <input
@@ -467,7 +475,6 @@ Rules:
   )
 }
 
-// all styles in one place - easier to tweak
 const S = {
   page: {
     minHeight: "100vh",
@@ -483,8 +490,6 @@ const S = {
     padding: "14px 14px 90px",
     gap: "10px",
   },
-
-  // header
   header: {
     display: "flex",
     justifyContent: "space-between",
@@ -494,8 +499,6 @@ const S = {
   },
   logo: { fontSize: "1.15rem", fontWeight: 700, color: "#7ee8a2" },
   logoSub: { fontSize: "0.72rem", color: "#334455" },
-
-  // upload
   dropzone: {
     border: "1.5px dashed #2a3a50",
     borderRadius: "10px",
@@ -507,8 +510,6 @@ const S = {
   },
   dropActive: { borderColor: "#7ee8a2", background: "#192435" },
   dropTxt: { fontSize: "0.83rem", color: "#4a5a70" },
-
-  // doc tabs
   tabRow: { display: "flex", flexWrap: "wrap", gap: "5px" },
   tab: {
     background: "#161b27",
@@ -521,8 +522,6 @@ const S = {
     transition: "all 0.12s",
   },
   tabActive: { borderColor: "#7ee8a2", color: "#7ee8a2" },
-
-  // controls
   controls: {
     display: "flex",
     gap: "6px",
@@ -555,8 +554,6 @@ const S = {
     background: "#1a2e1a",
     borderColor: "#7ee8a2",
   },
-
-  // summary
   summaryPanel: {
     background: "#161b27",
     border: "1px solid #1e2535",
@@ -569,10 +566,7 @@ const S = {
     fontWeight: 600,
     marginBottom: "8px",
   },
-
   divider: { borderTop: "1px solid #1e2535" },
-
-  // chat
   chatArea: {
     flex: 1,
     display: "flex",
@@ -618,10 +612,7 @@ const S = {
     color: "#7ee8a2",
     fontSize: "1rem",
     letterSpacing: "4px",
-    animation: "none",
   },
-
-  // followup chips
   chip: {
     background: "#161b27",
     border: "1px solid #1e2535",
@@ -632,8 +623,6 @@ const S = {
     cursor: "pointer",
     transition: "all 0.12s",
   },
-
-  // input bar
   inputBar: {
     position: "fixed",
     bottom: 0,
@@ -670,8 +659,6 @@ const S = {
     cursor: "pointer",
     transition: "opacity 0.15s",
   },
-
-  // key screen
   keyScreen: {
     margin: "auto",
     textAlign: "center",
