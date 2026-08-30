@@ -3,12 +3,10 @@ import ChatConversation from "../components/ChatConversation"
 import DocumentUploader from "../components/DocumentUploader"
 import MessageInput from "../components/MessageInput"
 
-const ENV_KEY_ACTIVE = Boolean(import.meta.env.VITE_GROQ_KEY?.trim())
-
 // This page arranges the upload, document controls, conversation, and input.
 export default function DocumentChatPage(props) {
   const {
-    resetKey, documents, activeDocumentName, activeDocument, selectDocument,
+    resetKey, isManagedKey, documents, activeDocumentName, activeDocument, selectDocument,
     indexing, dragActive, setDragActive, fileInputRef, processFiles,
     mode, setMode, showSources, setShowSources, showSummary, setShowSummary,
     clearChat, messages, followUpQuestions, sendMessage, bottomRef,
@@ -18,7 +16,7 @@ export default function DocumentChatPage(props) {
   return <div className="page"><main className="app">
     <header className="header">
       <div><span className="brand">DocMind</span><span className="tagline">Chat with PDFs</span></div>
-      {!ENV_KEY_ACTIVE && <button className="tool-button" onClick={resetKey}>Change key</button>}
+      {!isManagedKey && <button className="tool-button" onClick={resetKey}>Change key</button>}
     </header>
 
     <DocumentUploader indexing={indexing} dragActive={dragActive} fileInputRef={fileInputRef} onDragActiveChange={setDragActive} onFiles={processFiles} />

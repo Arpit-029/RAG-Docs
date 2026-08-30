@@ -173,3 +173,16 @@ MIT License — free to use, modify and distribute.
 
 
 Built this from scratch — every line understood, not copy-pasted.
+
+## Shared Groq key and rate limits
+
+For a public Vercel deployment where visitors can use the app without entering a key, add these environment variables in the Vercel project settings:
+
+```
+GROQ_API_KEY=your_groq_key
+VITE_USE_GROQ_PROXY=true
+```
+
+`GROQ_API_KEY` stays on the server in `api/groq.js`; it is never included in the browser bundle. The endpoint limits each IP to 12 requests or 12,000 estimated tokens per minute, and 200,000 estimated tokens per day. Do not use `VITE_GROQ_KEY` in a public deployment because Vite exposes it to every visitor.
+
+For local development without the server endpoint, leave `VITE_USE_GROQ_PROXY` unset and enter a personal key in the app.

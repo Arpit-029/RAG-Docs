@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react"
 import { modePrompts } from "../constants/chatModes"
-import { callGroq } from "../services/groq"
+import { callGroq, MANAGED_GROQ_KEY } from "../services/groq"
 import { parsePdf } from "../services/pdf"
 import { getTopChunks, chunkText } from "../utils/documentSearch"
 
 // Uses the deployment key first, then falls back to the key saved in this browser.
 export function resolveInitialKey() {
+  if (import.meta.env.VITE_USE_GROQ_PROXY === "true") return MANAGED_GROQ_KEY
   const environmentKey = import.meta.env.VITE_GROQ_KEY
   return environmentKey?.trim() || localStorage.getItem("dm_groq_key") || ""
 }
@@ -13,6 +14,7 @@ export function resolveInitialKey() {
 export function useDocMind() {
   // UI state is kept here so page and component files only render the interface.
   const [apiKey, setApiKey] = useState(resolveInitialKey)
+  const isManagedKey = apiKey === MANAGED_GROQ_KEY
   const [keyDraft, setKeyDraft] = useState("")
   const [documents, setDocuments] = useState([])
   const [activeDocumentName, setActiveDocumentName] = useState(null)
@@ -51,6 +53,7 @@ export function useDocMind() {
   }
 
   function resetKey() {
+    if (isManagedKey) return
     if (confirm("Reset API key?")) {
       localStorage.removeItem("dm_groq_key")
       setApiKey("")
@@ -121,6 +124,8 @@ Rules:
 - Answer based on the provided context.
 - For follow-ups like "explain more" or "go deeper", expand on the previous response.
 - If the topic isn't in the context, say so but still try to be helpful.
+- Keep it concise and specific.
+- keep it easy to understand, as if explaining to a 12-year-old.
 - Don't make stuff up.`
 
       // Send only role and content to the API; UI-only fields such as sources are excluded.
@@ -168,7 +173,7 @@ Rules:
   }
 
   return {
-    apiKey, keyDraft, setKeyDraft, saveKey, resetKey,
+    apiKey, isManagedKey, keyDraft, setKeyDraft, saveKey, resetKey,
     documents, activeDocumentName, activeDocument, selectDocument,
     messages, inputValue, setInputValue, mode, setMode, loading, indexing,
     showSources, setShowSources, showSummary, setShowSummary,
