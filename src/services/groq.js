@@ -1,11 +1,13 @@
 // A managed key is kept on the server. It is intentionally not an API key.
 export const MANAGED_GROQ_KEY = "managed"
+const DEFAULT_MODEL = "openai/gpt-oss-20b"
+const PREFERRED_MODELS = [DEFAULT_MODEL, "qwen/qwen3.8-27b", "qwen/qwen3.6-27b", "groq/compound-mini", "groq/compound"]
 
 // Reuse the selected model for the rest of this browser session.
 let cachedModel = null
 
 export async function getAvailableModel(key) {
-  if (key === MANAGED_GROQ_KEY) return "llama-3.3-70b-versatile"
+  if (key === MANAGED_GROQ_KEY) return DEFAULT_MODEL
   if (cachedModel) return cachedModel
 
   try {
@@ -14,15 +16,20 @@ export async function getAvailableModel(key) {
     })
     const data = await response.json()
 
-    if (response.ok && data.data?.length > 0) {
-      cachedModel = data.data[0].id
-      return cachedModel
+    const availableModels = data.data?.map(model => model.id) || []
+    if (response.ok && availableModels.length > 0) {
+      const selectedModel = PREFERRED_MODELS.find(model => availableModels.includes(model))
+        || availableModels.find(model => !/(whisper|speech|audio|guard|embedding)/i.test(model))
+      if (selectedModel) {
+        cachedModel = selectedModel
+        return cachedModel
+      }
     }
   } catch {
     // Use the fallback model below if the available-model request fails.
   }
 
-  cachedModel = "llama-3.3-70b-versatile"
+  cachedModel = DEFAULT_MODEL
   return cachedModel
 }
 

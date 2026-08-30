@@ -185,4 +185,6 @@ VITE_USE_GROQ_PROXY=true
 
 `GROQ_API_KEY` stays on the server in `api/groq.js`; it is never included in the browser bundle. The endpoint limits each IP to 12 requests or 12,000 estimated tokens per minute, and 200,000 estimated tokens per day. Do not use `VITE_GROQ_KEY` in a public deployment because Vite exposes it to every visitor.
 
+The server asks Groq which models your key can use and automatically selects a compatible chat model. You may set `GROQ_MODEL` only when you need to force a specific model allowed by your Groq project.
+
 For local development without the server endpoint, leave `VITE_USE_GROQ_PROXY` unset and enter a personal key in the app.
