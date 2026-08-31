@@ -1,14 +1,21 @@
 // Vercel serverless endpoint. Keep GROQ_API_KEY server-side: never prefix it
 // with VITE_ or send it to the browser.
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1"
-// Keep this ordered by quality/cost preference. The actual choice is made from
-// the models the deployment key can access, so retired models are skipped.
-const PREFERRED_MODELS = [
+const HIGH_QUALITY_MODELS = [
+  "openai/gpt-oss-120b",
+  "qwen/qwen3.8-27b",
+  "qwen/qwen3.6-27b",
+  "openai/gpt-oss-20b",
+  "groq/compound",
+  "groq/compound-mini",
+]
+const FAST_MODELS = [
   "openai/gpt-oss-20b",
   "qwen/qwen3.8-27b",
   "qwen/qwen3.6-27b",
   "groq/compound-mini",
   "groq/compound",
+  "openai/gpt-oss-120b",
 ]
 const MINUTE = 60_000
 const DAY = 24 * 60 * MINUTE
@@ -16,28 +23,46 @@ const MAX_REQUESTS_PER_MINUTE = 12
 const MAX_TOKENS_PER_MINUTE = 12_000
 const MAX_TOKENS_PER_DAY = 200_000
 const buckets = new Map()
-let cachedModels = null
+let cachedAvailableModels = null
 
 function isChatModel(model) {
   return !/(whisper|speech|audio|guard|embedding)/i.test(model)
 }
 
-async function getModels(apiKey, refresh = false) {
-  if (process.env.GROQ_MODEL) return [process.env.GROQ_MODEL]
-  if (cachedModels && !refresh) return cachedModels
+function unique(models) {
+  return [...new Set(models.filter(Boolean))]
+}
 
-  const response = await fetch(`${GROQ_BASE_URL}/models`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  })
-  const data = await response.json().catch(() => ({}))
-  const available = data.data?.map(model => model.id).filter(isChatModel) || []
-  if (!response.ok || !available.length) {
-    throw new Error(data.error?.message || "No compatible Groq chat model is available for this key.")
+async function getModels(apiKey, quality = "high", refresh = false) {
+  if (refresh) cachedAvailableModels = null
+  const preferred = quality === "fast" ? FAST_MODELS : HIGH_QUALITY_MODELS
+
+  if (!cachedAvailableModels) {
+    try {
+      const response = await fetch(`${GROQ_BASE_URL}/models`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      })
+      const data = await response.json().catch(() => ({}))
+      const discovered = data.data?.map(model => model.id).filter(isChatModel) || []
+      if (response.ok && discovered.length) cachedAvailableModels = discovered
+    } catch {
+      // Directly probe known models below when model discovery is unavailable.
+    }
   }
 
-  // Prefer known text models, then try any other text-capable model returned by Groq.
-  cachedModels = [...PREFERRED_MODELS.filter(model => available.includes(model)), ...available.filter(model => !PREFERRED_MODELS.includes(model))]
-  return cachedModels
+  const configuredModel = process.env.GROQ_MODEL
+  if (!cachedAvailableModels) return unique([configuredModel, ...preferred])
+
+  // A configured model is a preference, not a single point of failure.
+  return unique([
+    configuredModel,
+    ...preferred.filter(model => cachedAvailableModels.includes(model)),
+    ...cachedAvailableModels.filter(model => !preferred.includes(model)),
+  ])
+}
+
+function canFailOver(status) {
+  return [400, 403, 404, 408, 409, 410, 422, 429].includes(status) || status >= 500
 }
 
 function clientIp(request) {
@@ -94,33 +119,48 @@ export default async function handler(request, response) {
   const apiKey = process.env.GROQ_API_KEY
   if (!apiKey) return response.status(500).json({ error: { message: "Server is missing GROQ_API_KEY." } })
 
-  const { messages, maxTokens = 1500 } = request.body || {}
-  if (!Array.isArray(messages) || !messages.length || !Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 1500) {
+  const { messages, maxTokens = 1500, quality = "high", reasoningEffort = "medium" } = request.body || {}
+  if (!Array.isArray(messages) || !messages.length
+    || !Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > 1500
+    || !["fast", "high"].includes(quality)
+    || !["low", "medium", "high"].includes(reasoningEffort)) {
     return response.status(400).json({ error: { message: "Invalid chat request." } })
   }
 
   const estimatedTokens = estimateTokens(messages, maxTokens)
   if (!enforceLimit(request, response, estimatedTokens)) return
 
-  try {
-    let lastResponse
-    let lastData
-    for (const model of await getModels(apiKey)) {
-      const groqResponse = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model, messages, temperature: 0.4, max_tokens: maxTokens }),
-      })
-      const data = await groqResponse.json().catch(() => ({}))
-      if (groqResponse.ok || process.env.GROQ_MODEL || ![400, 403, 404].includes(groqResponse.status)) {
-        return response.status(groqResponse.status).json(data)
+  const attemptedModels = new Set()
+  let lastStatus = 503
+  let lastData = { error: { message: "No accessible Groq model is available." } }
+
+  // The second pass refreshes Groq's model list in case the cached selection was
+  // retired while this server instance was warm.
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (const model of await getModels(apiKey, quality, pass === 1)) {
+      if (attemptedModels.has(model)) continue
+      attemptedModels.add(model)
+
+      try {
+        const modelOptions = model.startsWith("openai/gpt-oss-") ? { reasoning_effort: reasoningEffort } : {}
+        const groqResponse = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({ model, messages, temperature: 0.35, max_tokens: maxTokens, ...modelOptions }),
+        })
+        const data = await groqResponse.json().catch(() => ({}))
+        if (groqResponse.ok) return response.status(200).json(data)
+
+        lastStatus = groqResponse.status
+        lastData = data
+        if (!canFailOver(groqResponse.status)) return response.status(groqResponse.status).json(data)
+      } catch {
+        lastStatus = 502
+        lastData = { error: { message: `Model ${model} is temporarily unreachable.` } }
       }
-      lastResponse = groqResponse
-      lastData = data
     }
-    cachedModels = null
-    return response.status(lastResponse?.status || 503).json(lastData || { error: { message: "No accessible Groq model is available." } })
-  } catch (error) {
-    return response.status(502).json({ error: { message: error.message || "Unable to reach Groq. Please try again." } })
   }
+
+  cachedAvailableModels = null
+  return response.status(lastStatus).json(lastData)
 }

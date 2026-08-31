@@ -8,13 +8,16 @@ export async function parsePdf(file) {
   const buffer = await file.arrayBuffer()
   const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
   let text = ""
+  const pageTexts = []
 
   // Read every page and combine its visible text into one searchable string.
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
     const page = await pdf.getPage(pageNumber)
     const content = await page.getTextContent()
-    text += `${content.items.map(item => item.str).join(" ")}\n`
+    const pageText = content.items.map(item => item.str).join(" ")
+    pageTexts.push(pageText)
+    text += `${pageText}\n`
   }
 
-  return { text, pages: pdf.numPages }
+  return { text, pageTexts, pages: pdf.numPages }
 }

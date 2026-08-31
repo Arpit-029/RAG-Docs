@@ -27,7 +27,7 @@ function Message({ message, showSources }) {
   return <div className={`message-row ${message.role}`}>
     <div className={`message ${message.role}`}>
       <div className="message-text">{message.content}</div>
-      {showSources && message.role === "assistant" && message.sources?.map((source, index) => <div key={index} className="source">Source {index + 1}: {shorten(source, 200)}</div>)}
+      {showSources && message.role === "assistant" && message.sources?.map((source, index) => <div key={index} className="source">Source {index + 1} · page {source.page}: {shorten(source.text, 240)}</div>)}
     </div>
   </div>
 }

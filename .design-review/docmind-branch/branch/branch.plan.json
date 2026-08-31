@@ -1,0 +1,232 @@
+{
+  "version": 1,
+  "runId": "crt-55c09c6fd7562240dec6ca42dd1f1b47d525707e",
+  "concept": "Expand this into the complete DocMind app while preserving its editorial research-workspace direction. Include: 1) secure Groq API-key onboarding with clear privacy reassurance and link to obtain a key; 2) empty workspace with prominent PDF upload/drop target and concise workflow guidance; 3) active PDF conversation with multi-document switching, chat modes, summary and sources toggles, clear/export actions, grounded answer citations, follow-up prompts, indexing/loading states, and persistent composer; 4) responsive mobile adaptation where the document library becomes a drawer and secondary controls collapse cleanly. Use only capabilities that exist in the current product. Keep accessible contrast, visible focus, 44px targets, and reduced-motion-safe transitions.",
+  "aspect": "landscape",
+  "scope": "site",
+  "sitePurpose": "Help researchers upload PDFs and ask grounded questions with traceable source citations.",
+  "statusUpdate": "I’ll extend the active research session with setup, a ready-to-upload workspace, and a responsive library experience. Together these routes take you from secure access to document-based research without losing context.",
+  "approvedScreenSummary": "The approved desktop app already shows a signed-in DocMind research workspace with library navigation, an uploaded contract-interpretation article, a grounded cited answer, source list, chat mode controls, document actions, and a persistent question composer.",
+  "winnerCanvas": {
+    "width": 1536,
+    "height": 1024
+  },
+  "pages": [
+    {
+      "index": 0,
+      "id": "p0-foundations-of-contract-interpretation-i",
+      "kind": "source",
+      "title": "Foundations of Contract Interpretation in Common Law Systems",
+      "pageType": "application",
+      "surfaceType": "web_app",
+      "purpose": "Continue the current research session while adding a second selected document and communicating indexing progress before it becomes available for grounded questioning.",
+      "startsFromWinner": true,
+      "slots": [
+        "a"
+      ]
+    },
+    {
+      "index": 1,
+      "id": "p1-connect-your-groq-api-key",
+      "kind": "additional",
+      "title": "Connect your Groq API key",
+      "pageType": "application",
+      "surfaceType": "web_app",
+      "purpose": "Let a new user securely connect the API key needed to use DocMind’s available research assistance.",
+      "startsFromWinner": false,
+      "slots": [
+        "b"
+      ]
+    },
+    {
+      "index": 2,
+      "id": "p2-your-document-workspace",
+      "kind": "additional",
+      "title": "Your document workspace",
+      "pageType": "application",
+      "surfaceType": "web_app",
+      "purpose": "Give a connected user an empty starting point for adding research material and understanding the first research steps.",
+      "startsFromWinner": false,
+      "slots": [
+        "c"
+      ]
+    },
+    {
+      "index": 3,
+      "id": "p3-research-library-on-a-narrow-screen",
+      "kind": "additional",
+      "title": "Research library on a narrow screen",
+      "pageType": "application",
+      "surfaceType": "web_app",
+      "purpose": "Support document research on smaller screens by making the library available on demand while preserving the selected conversation and composer.",
+      "startsFromWinner": false,
+      "slots": [
+        "d"
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "slot": "a",
+      "pageIndex": 0,
+      "viewportOrdinal": 2,
+      "status": "pending",
+      "direction": "Foundations of Contract Interpretation in Common Law Systems (part 2)",
+      "header": null,
+      "footer": null,
+      "pageEndsHere": true,
+      "dependsOnSlot": null,
+      "width": 1536,
+      "height": 1024,
+      "canvasDecision": {
+        "provenance": "inherited-from-winner",
+        "sourceCanvas": {
+          "width": 1536,
+          "height": 1024
+        }
+      },
+      "content": "Keep the contract-interpretation article selected while a newly added document, “Remedies for Breach in Commercial Agreements,” is indexing. Explain that questions can remain limited to the current article or include the new document when processing finishes, with clear loading feedback and an available follow-up question."
+    },
+    {
+      "slot": "b",
+      "pageIndex": 1,
+      "viewportOrdinal": 1,
+      "status": "pending",
+      "direction": "Connect your Groq API key",
+      "header": null,
+      "footer": null,
+      "pageEndsHere": true,
+      "dependsOnSlot": null,
+      "width": 1536,
+      "height": 1024,
+      "canvasDecision": {
+        "provenance": "inherited-from-winner",
+        "sourceCanvas": {
+          "width": 1536,
+          "height": 1024
+        }
+      },
+      "content": "Request a Groq API key with concise reassurance that the key is handled securely and document content is not used to train models. Provide a link to obtain a key, explain how to revoke or replace it, and let the user continue after validation."
+    },
+    {
+      "slot": "c",
+      "pageIndex": 2,
+      "viewportOrdinal": 1,
+      "status": "pending",
+      "direction": "Your document workspace",
+      "header": null,
+      "footer": null,
+      "pageEndsHere": true,
+      "dependsOnSlot": null,
+      "width": 1536,
+      "height": 1024,
+      "canvasDecision": {
+        "provenance": "inherited-from-winner",
+        "sourceCanvas": {
+          "width": 1536,
+          "height": 1024
+        }
+      },
+      "content": "Offer PDF upload or drag-and-drop as the primary task, including supported-file guidance and an accessible file picker. Briefly describe the workflow: upload documents, wait for indexing, then ask questions whose answers point back to the supplied sources."
+    },
+    {
+      "slot": "d",
+      "pageIndex": 3,
+      "viewportOrdinal": 1,
+      "status": "pending",
+      "direction": "Research library on a narrow screen",
+      "header": null,
+      "footer": null,
+      "pageEndsHere": true,
+      "dependsOnSlot": null,
+      "width": 1536,
+      "height": 1024,
+      "canvasDecision": {
+        "provenance": "inherited-from-winner",
+        "sourceCanvas": {
+          "width": 1536,
+          "height": 1024
+        }
+      },
+      "content": "Show the current contract-interpretation conversation in a narrow responsive state with library access available as a drawer. Retain the selected document, cited answer, follow-up prompts, and persistent composer; collapse secondary document actions and answer settings into accessible menus."
+    }
+  ],
+  "packagePages": [
+    {
+      "index": 0,
+      "id": "p0-foundations-of-contract-interpretation-i",
+      "kind": "source",
+      "title": "Foundations of Contract Interpretation in Common Law Systems",
+      "pageType": "application",
+      "surfaceType": "web_app",
+      "purpose": "Continue the current research session while adding a second selected document and communicating indexing progress before it becomes available for grounded questioning.",
+      "startsFromWinner": true,
+      "slots": [],
+      "packageLineage": {
+        "pageIndex": 0,
+        "pageId": "p0-foundations-of-contract-interpretation-i",
+        "viewportOrdinal": 1,
+        "state": "winner"
+      }
+    },
+    {
+      "index": 0,
+      "id": "p0-foundations-of-contract-interpretation-i-a",
+      "kind": "additional",
+      "title": "Foundations of Contract Interpretation in Common Law Systems (part 2)",
+      "pageType": "application",
+      "surfaceType": "web_app",
+      "purpose": "Keep the contract-interpretation article selected while a newly added document, “Remedies for Breach in Commercial Agreements,” is indexing. Explain that questions can remain limited to the current article or include the new document when processing finishes, with clear loading feedback and an available follow-up question.",
+      "startsFromWinner": false,
+      "slots": [
+        "a"
+      ],
+      "packageLineage": {
+        "pageIndex": 0,
+        "pageId": "p0-foundations-of-contract-interpretation-i",
+        "viewportOrdinal": 2,
+        "state": "screen",
+        "slot": "a"
+      }
+    },
+    {
+      "index": 1,
+      "id": "p1-connect-your-groq-api-key",
+      "kind": "additional",
+      "title": "Connect your Groq API key",
+      "pageType": "application",
+      "surfaceType": "web_app",
+      "purpose": "Let a new user securely connect the API key needed to use DocMind’s available research assistance.",
+      "startsFromWinner": false,
+      "slots": [
+        "b"
+      ]
+    },
+    {
+      "index": 2,
+      "id": "p2-your-document-workspace",
+      "kind": "additional",
+      "title": "Your document workspace",
+      "pageType": "application",
+      "surfaceType": "web_app",
+      "purpose": "Give a connected user an empty starting point for adding research material and understanding the first research steps.",
+      "startsFromWinner": false,
+      "slots": [
+        "c"
+      ]
+    },
+    {
+      "index": 3,
+      "id": "p3-research-library-on-a-narrow-screen",
+      "kind": "additional",
+      "title": "Research library on a narrow screen",
+      "pageType": "application",
+      "surfaceType": "web_app",
+      "purpose": "Support document research on smaller screens by making the library available on demand while preserving the selected conversation and composer.",
+      "startsFromWinner": false,
+      "slots": [
+        "d"
+      ]
+    }
+  ]
+}

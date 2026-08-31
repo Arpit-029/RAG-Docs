@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "workflowRevision": "branch-execute-v2",
+  "status": "converting",
+  "runKey": "branch:v1:img-956458e89550fb205da87c7e9a1d00ab:-:d3aab8dbaba51c2a:site:branch-execute-v2",
+  "origin": "https://12ui.com",
+  "scope": "site",
+  "concept": "Expand this into the complete DocMind app while preserving its editorial research-workspace direction. Include: 1) secure Groq API-key onboarding with clear privacy reassurance and link to obtain a key; 2) empty workspace with prominent PDF upload/drop target and concise workflow guidance; 3) active PDF conversation with multi-document switching, chat modes, summary and sources toggles, clear/export actions, grounded answer citations, follow-up prompts, indexing/loading states, and persistent composer; 4) responsive mobile adaptation where the document library becomes a drawer and secondary controls collapse cleanly. Use only capabilities that exist in the current product. Keep accessible contrast, visible focus, 44px targets, and reduced-motion-safe transitions.",
+  "conceptSha256": "d3aab8dbaba51c2a688b87578685bebf1280ab5ef727025529bc1c782d7bf062",
+  "winner": {
+    "kind": "image",
+    "imagePath": "C:\\Users\\Dell\\Desktop\\all\\RAG-Docs\\.design-review\\A.png",
+    "sha256": "956458e89550fb205da87c7e9a1d00ab2ca91a73518438ff310499f50a8228a5",
+    "mediaType": "image/png",
+    "width": 1536,
+    "height": 1024
+  },
+  "generationCanvas": {
+    "provenance": "inherited-from-winner",
+    "winner": {
+      "width": 1536,
+      "height": 1024
+    }
+  },
+  "maxScreens": 4,
+  "convert": {
+    "output": "html",
+    "model": "standard"
+  },
+  "prototype": true,
+  "createdAt": "2026-08-30T22:53:48.953Z",
+  "runId": "crt-55c09c6fd7562240dec6ca42dd1f1b47d525707e"
+}

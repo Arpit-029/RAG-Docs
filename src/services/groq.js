@@ -1,66 +1,96 @@
 // A managed key is kept on the server. It is intentionally not an API key.
 export const MANAGED_GROQ_KEY = "managed"
 const DEFAULT_MODEL = "openai/gpt-oss-20b"
-const PREFERRED_MODELS = [DEFAULT_MODEL, "qwen/qwen3.8-27b", "qwen/qwen3.6-27b", "groq/compound-mini", "groq/compound"]
+const PREFERRED_MODELS = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "qwen/qwen3.6-27b", DEFAULT_MODEL, "groq/compound", "groq/compound-mini"]
 
 // Reuse the selected model for the rest of this browser session.
-let cachedModel = null
+let cachedModels = null
+let cachedKey = null
 
-export async function getAvailableModel(key) {
-  if (key === MANAGED_GROQ_KEY) return DEFAULT_MODEL
-  if (cachedModel) return cachedModel
+function isChatModel(model) {
+  return !/(whisper|speech|audio|guard|embedding)/i.test(model)
+}
+
+function canFailOver(status) {
+  return [400, 403, 404, 408, 409, 410, 422, 429].includes(status) || status >= 500
+}
+
+async function getAvailableModels(key, refresh = false) {
+  if (cachedKey !== key || refresh) {
+    cachedKey = key
+    cachedModels = null
+  }
+  if (cachedModels) return cachedModels
 
   try {
     const response = await fetch("https://api.groq.com/openai/v1/models", {
       headers: { Authorization: `Bearer ${key}` },
     })
     const data = await response.json()
-
-    const availableModels = data.data?.map(model => model.id) || []
-    if (response.ok && availableModels.length > 0) {
-      const selectedModel = PREFERRED_MODELS.find(model => availableModels.includes(model))
-        || availableModels.find(model => !/(whisper|speech|audio|guard|embedding)/i.test(model))
-      if (selectedModel) {
-        cachedModel = selectedModel
-        return cachedModel
-      }
+    const available = data.data?.map(model => model.id).filter(isChatModel) || []
+    if (response.ok && available.length) {
+      cachedModels = [
+        ...PREFERRED_MODELS.filter(model => available.includes(model)),
+        ...available.filter(model => !PREFERRED_MODELS.includes(model)),
+      ]
+      return cachedModels
     }
   } catch {
-    // Use the fallback model below if the available-model request fails.
+    // Probe known models when discovery is temporarily unavailable.
   }
 
-  cachedModel = DEFAULT_MODEL
-  return cachedModel
+  return PREFERRED_MODELS
 }
 
-export async function callGroq(key, messages, maxTokens = 1500) {
+export async function getAvailableModel(key) {
+  if (key === MANAGED_GROQ_KEY) return DEFAULT_MODEL
+  return (await getAvailableModels(key))[0] || DEFAULT_MODEL
+}
+
+export async function callGroq(key, messages, maxTokens = 1500, options = {}) {
+  const quality = options.quality || "high"
+  const reasoningEffort = options.reasoningEffort || "medium"
   if (key === MANAGED_GROQ_KEY) {
     const response = await fetch("/api/groq", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages, maxTokens }),
+      body: JSON.stringify({ messages, maxTokens, quality, reasoningEffort }),
     })
     const data = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(data.error?.message || `API error ${response.status}`)
     return data.choices?.[0]?.message?.content || ""
   }
 
-  // Personal keys are used directly only when the hosted shared-key mode is disabled.
-  const model = await getAvailableModel(key)
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${key}`,
-    },
-    body: JSON.stringify({ model, messages, temperature: 0.4, max_tokens: maxTokens }),
-  })
+  // Personal-key mode receives the same automatic model failover as the server proxy.
+  const attemptedModels = new Set()
+  let lastError = "No accessible Groq model is available."
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (const model of await getAvailableModels(key, pass === 1)) {
+      if (attemptedModels.has(model)) continue
+      attemptedModels.add(model)
 
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}))
-    throw new Error(error.error?.message || `API error ${response.status}`)
+      try {
+        const modelOptions = model.startsWith("openai/gpt-oss-") ? { reasoning_effort: reasoningEffort } : {}
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+          body: JSON.stringify({ model, messages, temperature: 0.35, max_tokens: maxTokens, ...modelOptions }),
+        })
+        const data = await response.json().catch(() => ({}))
+        if (response.ok) return data.choices?.[0]?.message?.content || ""
+
+        lastError = data.error?.message || `API error ${response.status}`
+        if (!canFailOver(response.status)) {
+          const terminalError = new Error(lastError)
+          terminalError.stopFailover = true
+          throw terminalError
+        }
+      } catch (error) {
+        if (error.stopFailover) throw error
+        lastError = error.message || lastError
+      }
+    }
   }
 
-  const data = await response.json()
-  return data.choices[0].message.content
+  throw new Error(lastError)
 }

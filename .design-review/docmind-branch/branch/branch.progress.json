@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "runId": "crt-55c09c6fd7562240dec6ca42dd1f1b47d525707e",
+  "phase": "converting",
+  "startedAt": "2026-08-30T22:53:48.953Z",
+  "updatedAt": "2026-08-30T22:57:29.339Z",
+  "screens": [
+    {
+      "slot": "a",
+      "status": "succeeded",
+      "pageIndex": 1,
+      "viewportOrdinal": 1,
+      "generationPageIndex": 0,
+      "generationViewportOrdinal": 2
+    },
+    {
+      "slot": "b",
+      "status": "succeeded",
+      "pageIndex": 2,
+      "viewportOrdinal": 1,
+      "generationPageIndex": 1
+    },
+    {
+      "slot": "c",
+      "status": "succeeded",
+      "pageIndex": 3,
+      "viewportOrdinal": 1,
+      "generationPageIndex": 2
+    },
+    {
+      "slot": "d",
+      "status": "succeeded",
+      "pageIndex": 4,
+      "viewportOrdinal": 1,
+      "generationPageIndex": 3
+    }
+  ],
+  "pageCount": 5,
+  "logicalPageCount": 4,
+  "packages": [
+    {
+      "pageId": "p0-foundations-of-contract-interpretation-i",
+      "stage": "convert_viewports",
+      "createdAt": "2026-08-30T22:54:09.650Z",
+      "percent": 50,
+      "completed": 0,
+      "total": 1,
+      "running": 1,
+      "stageSince": "2026-08-30T22:54:17.606Z",
+      "childrenPercent": 83,
+      "children": [
+        {
+          "id": "p0-foundations-of-contract-interpretation-i/winner",
+          "stage": "materializing_assets",
+          "percent": 83
+        }
+      ],
+      "pagesAvailable": 0,
+      "updatedAt": "2026-08-30T22:57:29.339Z"
+    },
+    {
+      "pageId": "p2-your-document-workspace",
+      "stage": "convert_viewports",
+      "createdAt": "2026-08-30T22:54:58.019Z",
+      "percent": 21,
+      "completed": 0,
+      "total": 1,
+      "running": 1,
+      "stageSince": "2026-08-30T22:55:05.096Z",
+      "childrenPercent": 33,
+      "children": [
+        {
+          "id": "p2-your-document-workspace/c",
+          "stage": "extracting_layers",
+          "percent": 33
+        }
+      ],
+      "pagesAvailable": 0,
+      "updatedAt": "2026-08-30T22:57:26.753Z"
+    },
+    {
+      "pageId": "p1-connect-your-groq-api-key",
+      "stage": "convert_viewports",
+      "createdAt": "2026-08-30T22:54:58.248Z",
+      "percent": 50,
+      "completed": 0,
+      "total": 1,
+      "running": 1,
+      "stageSince": "2026-08-30T22:55:05.852Z",
+      "childrenPercent": 83,
+      "children": [
+        {
+          "id": "p1-connect-your-groq-api-key/b",
+          "stage": "materializing_assets",
+          "percent": 83
+        }
+      ],
+      "pagesAvailable": 0,
+      "updatedAt": "2026-08-30T22:57:27.956Z"
+    }
+  ]
+}

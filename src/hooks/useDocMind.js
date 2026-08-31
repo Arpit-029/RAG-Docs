@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react"
 import { modePrompts } from "../constants/chatModes"
 import { callGroq, MANAGED_GROQ_KEY } from "../services/groq"
 import { parsePdf } from "../services/pdf"
-import { getTopChunks, chunkText } from "../utils/documentSearch"
+import { getTopChunks, getTopChunksForQueries, chunkPages } from "../utils/documentSearch"
+import { buildAnswerMessages, buildFollowUpMessages, buildSearchPlanMessages, buildSummaryMessages } from "../utils/documentPrompts"
 
 // Uses the deployment key first, then falls back to the key saved in this browser.
 export function resolveInitialKey() {
@@ -80,16 +81,21 @@ export function useDocMind() {
       if (documents.find(document => document.name === file.name)) continue
 
       try {
-        const { text, pages } = await parsePdf(file)
-        // A summary is generated once, when the document is first uploaded.
-        const summary = await callGroq(apiKey, [{
-          role: "user",
-          content: `Summarise this in 5 bullet points. Specific and concise.\n\n${text.slice(0, 2500)}\n\nOnly bullet points:`,
-        }], 400)
+        const { pageTexts, pages } = await parsePdf(file)
+        const chunks = chunkPages(pageTexts)
+        if (!chunks.length) throw new Error("No readable text was found in this PDF.")
+
+        // Representative excerpts make summaries useful for the whole document,
+        // rather than only its opening pages.
+        const summarySources = getTopChunks(chunks, "summary overview main topics", 8)
+        const summary = await callGroq(apiKey, buildSummaryMessages(file.name, summarySources), 650, {
+          quality: "high",
+          reasoningEffort: "medium",
+        })
 
         setDocuments(previousDocuments => [...previousDocuments, {
           name: file.name,
-          chunks: chunkText(text),
+          chunks,
           pages,
           summary,
         }])
@@ -114,29 +120,21 @@ export function useDocMind() {
     setLoading(true)
 
     try {
-      // Search using the current question and recent conversation for better context.
-      const recentText = conversation.slice(-5).map(message => message.content).join(" ")
-      const sourceChunks = getTopChunks(activeDocument.chunks, `${recentText} ${text}`)
-      const context = sourceChunks.map((chunk, index) => `[${index + 1}]: ${chunk}`).join("\n\n---\n\n")
-      const systemMessage = `You are DocMind, a document assistant. Currently analysing: ${activeDocumentName}.
-Response style: ${modePrompts[mode]}
-Rules:
-- Answer based on the provided context.
-- For follow-ups like "explain more" or "go deeper", expand on the previous response.
-- If the topic isn't in the context, say so but still try to be helpful.
-- Keep it concise and specific.
-- keep it easy to understand, as if explaining to a 12-year-old.
-- Don't make stuff up.`
-
-      // Send only role and content to the API; UI-only fields such as sources are excluded.
-      const reply = await callGroq(apiKey, [
-        { role: "system", content: systemMessage },
-        ...conversation.slice(-20, -1).map(message => ({
-          role: message.role,
-          content: message.content,
-        })),
-        { role: "user", content: `Context from document:\n${context}\n\nQuestion: ${text}` },
-      ])
+      const priorConversation = conversation.slice(0, -1)
+      const searchQueries = await planSearchQueries(apiKey, activeDocumentName, priorConversation, text)
+      const sourceChunks = getTopChunksForQueries(activeDocument.chunks, searchQueries)
+      const answerMessages = buildAnswerMessages({
+        documentName: activeDocumentName,
+        modePrompt: modePrompts[mode],
+        conversation: priorConversation,
+        question: text,
+        sources: sourceChunks,
+      })
+      const maxTokens = mode === "Quick" ? 350 : mode === "Deep" ? 1400 : 900
+      const reply = await callGroq(apiKey, answerMessages, maxTokens, {
+        quality: "high",
+        reasoningEffort: mode === "Deep" ? "high" : "medium",
+      })
 
       setMessages(previousMessages => [...previousMessages, {
         role: "assistant",
@@ -147,7 +145,7 @@ Rules:
     } catch (error) {
       setMessages(previousMessages => [...previousMessages, {
         role: "assistant",
-        content: `Something went wrong: ${error.message}`,
+        content: `I couldn't complete that request. ${error.message}`,
       }])
     }
 
@@ -157,14 +155,14 @@ Rules:
 
   function loadFollowUpQuestions(question, reply) {
     // Follow-ups are optional, so a failure here must not interrupt the chat.
-    callGroq(apiKey, [{
-      role: "user",
-      content: `Give 3 short follow-up questions as a JSON array. Nothing else.\nQ: ${question}\nA: ${reply.slice(0, 300)}\nFormat: ["q1?","q2?","q3?"]`,
-    }], 120)
+    callGroq(apiKey, buildFollowUpMessages(activeDocumentName, question, reply), 180, {
+      quality: "fast",
+      reasoningEffort: "low",
+    })
       .then(rawResponse => {
         try {
           const questions = JSON.parse(rawResponse.slice(rawResponse.indexOf("["), rawResponse.lastIndexOf("]") + 1))
-          setFollowUpQuestions(questions)
+          if (Array.isArray(questions)) setFollowUpQuestions(questions.filter(question => typeof question === "string").slice(0, 3))
         } catch {
           // The response was not a valid JSON array, so do not show follow-ups.
         }
@@ -179,5 +177,26 @@ Rules:
     showSources, setShowSources, showSummary, setShowSummary,
     followUpQuestions, dragActive, setDragActive, processFiles, sendMessage, clearChat,
     fileInputRef, bottomRef, inputRef,
+  }
+}
+
+async function planSearchQueries(apiKey, documentName, conversation, question) {
+  try {
+    const rawResponse = await callGroq(
+      apiKey,
+      buildSearchPlanMessages(documentName, conversation, question),
+      180,
+      { quality: "fast", reasoningEffort: "low" },
+    )
+    const json = rawResponse.slice(rawResponse.indexOf("{"), rawResponse.lastIndexOf("}") + 1)
+    const parsed = JSON.parse(json)
+    const generatedQueries = Array.isArray(parsed.queries)
+      ? parsed.queries.filter(query => typeof query === "string" && query.trim()).map(query => query.trim())
+      : []
+    return [...new Set([question.trim(), ...generatedQueries])].slice(0, 4)
+  } catch {
+    // Search planning improves difficult questions, but basic retrieval remains
+    // available if the utility request is rate-limited or malformed.
+    return [question.trim()]
   }
 }
