@@ -14,19 +14,29 @@ export function resolveInitialKey() {
 
 export function useDocMind() {
   // UI state is kept here so page and component files only render the interface.
+  const previewComposer = import.meta.env.DEV && new URLSearchParams(window.location.search).has("previewComposer")
+  const previewDocument = previewComposer
+    ? { name: "Universal_Delivery_Challan_Template.pdf", chunks: [], pages: 1, summary: "Preview document" }
+    : null
   const [apiKey, setApiKey] = useState(resolveInitialKey)
   const isManagedKey = apiKey === MANAGED_GROQ_KEY
   const [keyDraft, setKeyDraft] = useState("")
-  const [documents, setDocuments] = useState([])
-  const [activeDocumentName, setActiveDocumentName] = useState(null)
-  const [messages, setMessages] = useState([])
+  const [documents, setDocuments] = useState(() => previewDocument ? [previewDocument] : [])
+  const [activeDocumentName, setActiveDocumentName] = useState(previewDocument?.name || null)
+  const [messages, setMessages] = useState(() => previewComposer ? [
+    { role: "assistant", content: "The delivery challan records the recipient, delivery date, and item details." },
+  ] : [])
   const [inputValue, setInputValue] = useState("")
   const [mode, setMode] = useState("Chat")
   const [loading, setLoading] = useState(false)
   const [indexing, setIndexing] = useState(false)
   const [showSources, setShowSources] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
-  const [followUpQuestions, setFollowUpQuestions] = useState([])
+  const [followUpQuestions, setFollowUpQuestions] = useState(() => previewComposer ? [
+    "What fields are required on the delivery challan?",
+    "How should the delivery date be formatted?",
+    "Where should signatures be added?",
+  ] : [])
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef(null)
   const bottomRef = useRef(null)
@@ -130,7 +140,7 @@ export function useDocMind() {
         question: text,
         sources: sourceChunks,
       })
-      const maxTokens = mode === "Quick" ? 350 : mode === "Deep" ? 1400 : 900
+      const maxTokens = mode === "Quick" ? 300 : mode === "Deep" ? 1100 : mode === "Simple" ? 650 : 500
       const reply = await callGroq(apiKey, answerMessages, maxTokens, {
         quality: "high",
         reasoningEffort: mode === "Deep" ? "high" : "medium",

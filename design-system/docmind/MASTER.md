@@ -6,7 +6,7 @@
 
 ---
 
-**Project:** DocMind
+**Project:** AEOS
 **Generated:** 2026-08-31 04:15:28
 **Category:** Research Lab / University Department
 **Design Dials:** Variance 7/10 (Balanced / Modern) | Motion 6/10 (Standard) | Density 7/10 (Standard)

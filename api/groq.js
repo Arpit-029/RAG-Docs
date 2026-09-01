@@ -146,7 +146,7 @@ export default async function handler(request, response) {
         const groqResponse = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify({ model, messages, temperature: 0.35, max_tokens: maxTokens, ...modelOptions }),
+          body: JSON.stringify({ model, messages, temperature: 0.2, max_tokens: maxTokens, ...modelOptions }),
         })
         const data = await groqResponse.json().catch(() => ({}))
         if (groqResponse.ok) return response.status(200).json(data)

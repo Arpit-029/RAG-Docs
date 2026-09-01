@@ -1,32 +1,39 @@
 // Shows every chat state: empty state, messages, loading state, and follow-ups.
-export default function ChatConversation({ document, messages, loading, showSources, followUpQuestions, onFollowUp, bottomRef }) {
+import AppIcon from "./AppIcon"
+import BrandMark from "./BrandMark"
+
+export default function ChatConversation({ document, messages, loading, showSources, bottomRef, onSpeak, onStopSpeaking, isSpeaking }) {
   return <section className="chat">
     {!document && <EmptyState>Upload a PDF above to start chatting.</EmptyState>}
-    {document && messages.length === 0 && <EmptyState>Ask anything about <strong className="accent">{document.name}</strong></EmptyState>}
+    {document && messages.length === 0 && <EmptyState />}
 
-    {messages.map((message, index) => <Message key={index} message={message} showSources={showSources} />)}
+    {messages.map((message, index) => <Message key={index} message={message} showSources={showSources} onSpeak={onSpeak} onStopSpeaking={onStopSpeaking} isSpeaking={isSpeaking && index === messages.length - 1} />)}
 
     {loading && <div className="message-row assistant"><div className="message assistant"><span className="typing">Loading...</span></div></div>}
-
-    {followUpQuestions.length > 0 && !loading && <div className="follow-ups">
-      <div className="follow-ups-label">Follow-up questions</div>
-      <div className="follow-up-list">
-        {followUpQuestions.map((question, index) => <button key={index} className="chip" onClick={() => onFollowUp(question)}>{shorten(question)}</button>)}
-      </div>
-    </div>}
 
     <div ref={bottomRef} />
   </section>
 }
 
 function EmptyState({ children }) {
-  return <div className="empty-state"><strong className="accent">DocMind</strong><div>{children}</div></div>
+  return <div className="empty-state">
+    <BrandMark className="empty-state-brand" />
+    {children && <div>{children}</div>}
+  </div>
 }
 
-function Message({ message, showSources }) {
+function Message({ message, showSources, onSpeak, onStopSpeaking, isSpeaking }) {
+  const pages = [...new Set(
+    [...message.content.matchAll(/\[(?:S\d+,\s*)?p\.\s*(\d+)\]/gi)].map(match => Number(match[1])),
+  )]
   return <div className={`message-row ${message.role}`}>
     <div className={`message ${message.role}`}>
       <div className="message-text">{message.content}</div>
+      {message.role === "assistant" && <div className="answer-footer">
+        {pages.length > 0 && <span className="page-reference"><AppIcon name="document" size={15} /> Pages {pages.join(", ")}</span>}
+        <button type="button" className="playback-button" onClick={() => isSpeaking ? onStopSpeaking() : onSpeak(message.content)} aria-label={isSpeaking ? "Stop speaking" : "Read answer aloud"}><AppIcon name={isSpeaking ? "stop" : "volume"} size={17} /></button>
+        <button type="button" className="playback-button" onClick={() => onSpeak(message.content)} aria-label="Replay answer"><AppIcon name="replay" size={17} /></button>
+      </div>}
       {showSources && message.role === "assistant" && message.sources?.map((source, index) => <div key={index} className="source">Source {index + 1} · page {source.page}: {shorten(source.text, 240)}</div>)}
     </div>
   </div>

@@ -74,7 +74,7 @@ export async function callGroq(key, messages, maxTokens = 1500, options = {}) {
         const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-          body: JSON.stringify({ model, messages, temperature: 0.35, max_tokens: maxTokens, ...modelOptions }),
+          body: JSON.stringify({ model, messages, temperature: 0.2, max_tokens: maxTokens, ...modelOptions }),
         })
         const data = await response.json().catch(() => ({}))
         if (response.ok) return data.choices?.[0]?.message?.content || ""
