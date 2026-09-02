@@ -101,7 +101,9 @@ export default function VoiceOrb({ state, disabled, onClick, mediaStream }) {
   const analyserRef = useRef(null)
   const frequencyDataRef = useRef(null)
 
-  stateRef.current = state
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   useEffect(() => {
     if (state !== "listening" || !mediaStream) {
