@@ -623,8 +623,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, [role="button"]
   .document-active:not(.has-conversation) .chat { padding: 0; overflow: hidden; }
   .document-active .composer-suggestions { margin-right: 0; margin-left: 0; }
   .document-active .input-bar { position: static; margin: 0; }
-  .document-active:has(.text-input:focus) .voice-layout { grid-template-rows: 0 minmax(0, 1fr); }
-  .document-active:has(.text-input:focus) .voice-stage { overflow: hidden; visibility: hidden; }
+  .document-active:has(.text-input:focus) .voice-layout { grid-template-rows: minmax(92px, 34%) minmax(0, 1fr); }
+  .document-active:has(.text-input:focus) .voice-stage { overflow: hidden; }
+  .document-active:has(.text-input:focus) .voice-orb { width: clamp(88px, 24vw, 112px); }
+  .document-active:has(.text-input:focus) .voice-copy { display: none; }
 }
 
 @media (max-width: 390px) {

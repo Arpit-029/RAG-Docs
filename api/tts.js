@@ -2,7 +2,7 @@ import { consumeRateLimit, sendLimitResponse } from "../server/rateLimit.js"
 import { requestOriginAllowed, validateSpeechText } from "../server/requestGuards.js"
 
 const CLOUDFLARE_TTS_MODEL = "@cf/deepgram/aura-1"
-const CLOUDFLARE_TTS_SPEAKER = "luna"
+const CLOUDFLARE_TTS_SPEAKER = "athena"
 const MAX_FREE_CHARACTERS_PER_DAY = 7_000
 
 export default async function handler(request, response) {

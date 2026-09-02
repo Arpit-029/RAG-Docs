@@ -28,8 +28,8 @@ test("audio format selection uses the first supported Groq format", () => {
 })
 
 test("spoken answers keep natural pauses while removing visual markup", () => {
-  const answer = "## Summary\n\n- First point [S1, p. 3]\n- Read [the guide](https://example.com)."
-  assert.equal(prepareTextForSpeech(answer), "Summary. First point, Read the guide.")
+  const answer = "## Summary\n\n- First point [S1, p. 3]\n- Second point {s1 , p. 5}\n- Read [the guide](https://example.com)."
+  assert.equal(prepareTextForSpeech(answer), "Summary. First point, Second point, Read the guide.")
 })
 
 test("speech profile uses a calm natural pitch", () => {

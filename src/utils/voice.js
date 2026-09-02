@@ -14,7 +14,7 @@ export const VOICE_LANGUAGES = [
 ]
 
 export const SMOOTH_SPEECH_SETTINGS = Object.freeze({
-  rate: 0.88,
+  rate: 0.85,
   pitch: 1,
   volume: 1,
 })
@@ -61,7 +61,7 @@ export function normalizeVoiceLanguage(language) {
 
 export function prepareTextForSpeech(text = "") {
   return text
-    .replace(/\[(?:S\d+,\s*)?p\.\s*\d+\]/gi, "")
+    .replace(/(?:\(|\x7b|\[)\s*(?:(?:S(?:ource)?\s*\d+)\s*,?\s*)?p{1,2}\.\s*\d+(?:\s*(?:[-–—]|to)\s*\d+)?(?:\s*[;,]\s*(?:(?:S(?:ource)?\s*\d+)\s*,?\s*)?p{1,2}\.\s*\d+(?:\s*(?:[-–—]|to)\s*\d+)?)*\s*(?:\)|\x7d|\])/gi, "")
     .replace(/\[([^\]]+)]\([^)]+\)/g, "$1")
     .replace(/\r\n?/g, "\n")
     .replace(/^[\t ]*(?:#{1,6}|[-*+>]|\d+[.)])[\t ]+/gm, "")

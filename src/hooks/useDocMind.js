@@ -219,7 +219,6 @@ export function useDocMind() {
       answerGateRef.current.finish(request.id)
       if (isCurrent) {
         setLoading(false)
-        setTimeout(() => inputRef.current?.focus(), 100)
       }
     }
   }

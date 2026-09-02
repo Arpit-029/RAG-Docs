@@ -154,6 +154,8 @@ export function useVoiceInteraction({ onTranscript, onSubmit, disabled, apiKey }
         speechRequestRef.current = null
         const url = URL.createObjectURL(blob)
         const audio = new Audio(url)
+        audio.playbackRate = SMOOTH_SPEECH_SETTINGS.rate
+        audio.preservesPitch = true
         playbackUrlRef.current = url
         playbackAudioRef.current = audio
         const finish = () => {
