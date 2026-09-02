@@ -1,9 +1,6 @@
-import { CHAT_MODES } from "../constants/chatModes"
 import { downloadChat } from "../utils/chatExport"
 
 export default function ChatControls({
-  mode,
-  onModeChange,
   showSources,
   onSourcesToggle,
   showSummary,
@@ -16,13 +13,6 @@ export default function ChatControls({
   documentName,
 }) {
   return <div className="answer-controls">
-    <div className="control-group">
-      <label className="control-label" htmlFor="answer-style">Answer style</label>
-      <select id="answer-style" className="mode-select" value={mode} onChange={event => onModeChange(event.target.value)}>
-        {CHAT_MODES.map(chatMode => <option key={chatMode}>{chatMode}</option>)}
-      </select>
-    </div>
-
     <div className="control-group">
       <label className="control-label" htmlFor="voice-language">Voice language</label>
       <select id="voice-language" className="mode-select" value={voiceLanguage} onChange={event => onVoiceLanguageChange(event.target.value)}>

@@ -1,11 +1,15 @@
 // Shows every chat state: empty state, messages, loading state, and follow-ups.
 import AppIcon from "./AppIcon"
 
-export default function ChatConversation({ messages, loading, showSources, bottomRef, onSpeak, onStopSpeaking, isSpeaking }) {
+export default function ChatConversation({ messages, loading, showSources, bottomRef, onSpeak, onStopSpeaking, isSpeaking, suggestions = [], onSuggestion }) {
   return <section className="chat">
     {messages.map((message, index) => <Message key={index} message={message} showSources={showSources} onSpeak={onSpeak} onStopSpeaking={onStopSpeaking} isSpeaking={isSpeaking && index === messages.length - 1} />)}
 
     {loading && <div className="message-row assistant"><div className="message assistant"><span className="typing">Loading...</span></div></div>}
+
+    {suggestions.length > 0 && !loading && <div className="chat-suggestions" aria-label="Suggested follow-up questions">
+      {suggestions.map((question, index) => <button key={index} type="button" className="suggestion-chip" onClick={() => onSuggestion(question)} title={question}>{question}</button>)}
+    </div>}
 
     <div ref={bottomRef} />
   </section>

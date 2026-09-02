@@ -5,7 +5,7 @@ import { loadActiveDocument, saveActiveDocument } from "../services/documentStor
 import { isPdfFile, validatePdfFile } from "../utils/pdfLimits"
 import { createRequestGate } from "../utils/requestGate"
 import { getTopChunks, getTopChunksForQueries, chunkPages } from "../utils/documentSearch"
-import { buildAnswerMessages, buildFollowUpMessages, buildSearchPlanMessages, buildSummaryMessages } from "../utils/documentPrompts"
+import { buildAnswerMessages, buildFallbackSearchQueries, buildFollowUpMessages, buildSearchPlanMessages, buildSummaryMessages } from "../utils/documentPrompts"
 
 const EMPTY_CONVERSATION = Object.freeze({ messages: [], followUpQuestions: [] })
 
@@ -277,6 +277,6 @@ async function planSearchQueries(apiKey, documentName, conversation, question, s
     if (error.name === "AbortError") throw error
     // Search planning improves difficult questions, but basic retrieval remains
     // available if the utility request is rate-limited or malformed.
-    return [question.trim()]
+    return buildFallbackSearchQueries(conversation, question)
   }
 }

@@ -14,7 +14,7 @@ export const VOICE_LANGUAGES = [
 ]
 
 export const SMOOTH_SPEECH_SETTINGS = Object.freeze({
-  rate: 0.85,
+  rate: 0.88,
   pitch: 1,
   volume: 1,
 })

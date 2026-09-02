@@ -191,7 +191,7 @@ CLOUDFLARE_API_TOKEN=your_workers_ai_token
 
 Voice questions are recorded in the browser and sent to Groq's `whisper-large-v3-turbo` transcription endpoint. Recordings stop automatically after one minute and are capped at 10 MB. Do not use `VITE_GROQ_KEY` in a public deployment because Vite exposes it to every visitor.
 
-English answers use Cloudflare Workers AI Aura 1 with the calm `athena` voice at a slower, pitch-preserving playback rate. The Cloudflare credentials stay in `api/tts.js`; never expose them with a `VITE_` prefix. The proxy caps each visitor at 7,000 spoken characters per day to fit within the service's free allocation. Non-English speech and temporary cloud failures fall back to the browser's installed voice.
+English answers use Cloudflare Workers AI Aura 1 with the clear, knowledgeable `asteria` voice at a restrained, pitch-preserving playback rate. The Cloudflare credentials stay in `api/tts.js`; never expose them with a `VITE_` prefix. The proxy caps each visitor at 7,000 spoken characters per day to fit within the service's free allocation. Non-English speech and temporary cloud failures fall back to the browser's installed voice.
 
 The server asks Groq which models your key can use and automatically selects a compatible chat model. You may set `GROQ_MODEL` only when you need to force a specific model allowed by your Groq project.
 

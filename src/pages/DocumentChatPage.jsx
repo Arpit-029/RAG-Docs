@@ -137,8 +137,6 @@ export default function DocumentChatPage(props) {
         <div className="utility-panel">
           <div className="utility-title">Answer controls</div>
           {activeDocument && <ChatControls
-            mode={mode}
-            onModeChange={setMode}
             showSources={showSources}
             onSourcesToggle={() => setShowSources(value => !value)}
             showSummary={showSummary}
@@ -202,6 +200,8 @@ export default function DocumentChatPage(props) {
           onSpeak={voice.speak}
           onStopSpeaking={voice.stopSpeaking}
           isSpeaking={voice.isSpeaking}
+          suggestions={followUpQuestions}
+          onSuggestion={sendMessage}
         />
 
         {activeDocument && <MessageInput
@@ -213,8 +213,8 @@ export default function DocumentChatPage(props) {
           listening={voice.isListening}
           transcribing={voice.isTranscribing}
           onVoiceToggle={voice.toggleListening}
-          suggestions={followUpQuestions}
-          onSuggestion={sendMessage}
+          mode={mode}
+          onModeChange={setMode}
         />}
       </section>}
     </div>

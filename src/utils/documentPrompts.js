@@ -36,19 +36,30 @@ Document: ${documentName}`
 }
 
 export function buildSearchPlanMessages(documentName, conversation, question) {
-  const recentQuestions = conversation
-    .filter(message => message.role === "user")
-    .slice(-3)
-    .map(message => message.content)
-    .join("\n")
+  const recentConversation = formatConversationContext(conversation)
 
   return [{
     role: "system",
-    content: `Rewrite a user's question into search queries for lexical retrieval over a document. Resolve pronouns from conversation, include likely synonyms and exact entities, and preserve the user's intent. Return only JSON in this shape: {"queries":["query one","query two","query three"]}. Do not answer the question.`,
+    content: `Rewrite a user's question into standalone search queries for lexical retrieval over a document. Use both sides of the recent conversation to resolve references such as "it", "that", "the second one", and omitted subjects. Include likely synonyms and exact entities, and preserve the user's intent. Return only JSON in this shape: {"queries":["query one","query two","query three"]}. Do not answer the question.`,
   }, {
     role: "user",
-    content: `Document: ${documentName}\nRecent user questions:\n${recentQuestions || "None"}\n\nCurrent question: ${question}`,
+    content: `Document: ${documentName}\nRecent conversation:\n${recentConversation || "None"}\n\nCurrent question: ${question}`,
   }]
+}
+
+export function buildFallbackSearchQueries(conversation, question) {
+  const currentQuestion = question.trim()
+  const recentConversation = formatConversationContext(conversation)
+  if (!recentConversation) return [currentQuestion]
+
+  return [currentQuestion, `${recentConversation}\nCurrent question: ${currentQuestion}`]
+}
+
+function formatConversationContext(conversation) {
+  return conversation
+    .slice(-6)
+    .map(message => `${message.role === "assistant" ? "Assistant" : "User"}: ${message.content.slice(0, 1500)}`)
+    .join("\n")
 }
 
 export function buildSummaryMessages(documentName, sources) {

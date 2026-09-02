@@ -24,7 +24,7 @@ Use the system UI stack for reliable loading and clear document reading. The AEO
 
 ## Composition
 
-Before upload, the screen follows one vertical path from the orb to the uploader. After upload and before the first question, the clean dome and prompt sit centered in the available frame with no empty-chat mark. Once a question, answer, loading state, or follow-up appears, the dome lifts into a compact top stage so the conversation can expand below it. The document remains background context without a document card or a boxed conversation section.
+Before upload, the screen follows one vertical path from the orb to the uploader. After upload and before the first question, the clean dome and prompt sit centered in the available frame; on laptop layouts, the AEOS wordmark quietly centers the empty answer region. Once a question, answer, loading state, or follow-up appears, the dome lifts into a compact top stage so the conversation can expand below it. The document remains background context without a document card or a boxed conversation section.
 
 ## Components
 
