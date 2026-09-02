@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react"
 import { modePrompts } from "../constants/chatModes"
 import { callGroq, MANAGED_GROQ_KEY } from "../services/groq"
 import { loadActiveDocument, saveActiveDocument } from "../services/documentStore"
-import { parsePdf } from "../services/pdf"
 import { isPdfFile, validatePdfFile } from "../utils/pdfLimits"
 import { createRequestGate } from "../utils/requestGate"
 import { getTopChunks, getTopChunksForQueries, chunkPages } from "../utils/documentSearch"
@@ -139,6 +138,9 @@ export function useDocMind() {
     setIndexing(true)
     try {
       setProcessingDocument({ name: file.name, stage: "reading" })
+      // PDF.js is large and only needed after a user selects a document.
+      // Loading it here keeps the initial mobile experience lightweight.
+      const { parsePdf } = await import("../services/pdf")
       const { pageTexts, pages } = await parsePdf(file)
       setProcessingDocument({ name: file.name, stage: "extracting" })
       const chunks = chunkPages(pageTexts)
