@@ -183,11 +183,15 @@ GROQ_API_KEY=your_groq_key
 VITE_USE_GROQ_PROXY=true
 KV_REST_API_URL=your_upstash_rest_url
 KV_REST_API_TOKEN=your_upstash_rest_token
+CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
+CLOUDFLARE_API_TOKEN=your_workers_ai_token
 ```
 
 `GROQ_API_KEY` stays on the server in `api/groq.js`; it is never included in the browser bundle. Chat requests are limited per IP to 12 requests or 12,000 estimated tokens per minute and 200,000 estimated tokens per day. Voice transcription is limited separately. Production managed-key deployments fail closed unless an Upstash-compatible durable REST store is configured with either the `KV_REST_API_*` or `UPSTASH_REDIS_REST_*` variable pair. Set `AEOS_ALLOWED_ORIGINS` to a comma-separated list only when requests must also come from additional trusted origins.
 
 Voice questions are recorded in the browser and sent to Groq's `whisper-large-v3-turbo` transcription endpoint. Recordings stop automatically after one minute and are capped at 10 MB. Do not use `VITE_GROQ_KEY` in a public deployment because Vite exposes it to every visitor.
+
+English answers use Cloudflare Workers AI Aura 1 with the natural `luna` voice. The Cloudflare credentials stay in `api/tts.js`; never expose them with a `VITE_` prefix. The proxy caps each visitor at 7,000 spoken characters per day to fit within the service's free allocation. Non-English speech and temporary cloud failures fall back to the browser's installed voice.
 
 The server asks Groq which models your key can use and automatically selects a compatible chat model. You may set `GROQ_MODEL` only when you need to force a specific model allowed by your Groq project.
 

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { transcribeAudio } from "../services/transcription"
+import { synthesizeSpeech } from "../services/speech"
 import {
   mediaErrorMessage,
   normalizeVoiceLanguage,
+  prepareTextForSpeech,
   preferredAudioMimeType,
   recognitionErrorMessage,
+  SMOOTH_SPEECH_SETTINGS,
+  updateSpeechEndDetector,
   VOICE_LANGUAGES,
 } from "../utils/voice"
 
@@ -19,14 +23,6 @@ function speechRecognitionConstructor() {
 function mediaRecorderConstructor() {
   if (typeof window === "undefined") return null
   return window.MediaRecorder || null
-}
-
-function textForSpeech(text) {
-  return text
-    .replace(/\[(?:S\d+,\s*)?p\.\s*\d+\]/gi, "")
-    .replace(/[`*_#>-]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
 }
 
 const ELEGANT_FEMALE_VOICE_NAMES = [
@@ -75,7 +71,9 @@ export function useVoiceInteraction({ onTranscript, onSubmit, disabled, apiKey }
   const recognitionSupported = Boolean(Recognition)
   const recordingSupported = Boolean(Recorder && typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia)
   const voiceSupported = recordingSupported || recognitionSupported
-  const speechSupported = typeof window !== "undefined" && "speechSynthesis" in window
+  const nativeSpeechSupported = typeof window !== "undefined" && "speechSynthesis" in window
+  const cloudSpeechSupported = typeof window !== "undefined" && "Audio" in window
+  const speechSupported = cloudSpeechSupported || nativeSpeechSupported
   const [isListening, setIsListening] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -90,6 +88,7 @@ export function useVoiceInteraction({ onTranscript, onSubmit, disabled, apiKey }
   const streamRef = useRef(null)
   const audioChunksRef = useRef([])
   const recordingTimerRef = useRef(null)
+  const voiceDetectionCleanupRef = useRef(null)
   const transcriptionControllerRef = useRef(null)
   const transcriptRef = useRef("")
   const cancelSubmissionRef = useRef(false)
@@ -100,6 +99,9 @@ export function useVoiceInteraction({ onTranscript, onSubmit, disabled, apiKey }
   const onTranscriptRef = useRef(onTranscript)
   const onSubmitRef = useRef(onSubmit)
   const availableVoicesRef = useRef([])
+  const speechRequestRef = useRef(null)
+  const playbackAudioRef = useRef(null)
+  const playbackUrlRef = useRef("")
 
   useEffect(() => { disabledRef.current = disabled }, [disabled])
   useEffect(() => { onTranscriptRef.current = onTranscript }, [onTranscript])
@@ -112,44 +114,140 @@ export function useVoiceInteraction({ onTranscript, onSubmit, disabled, apiKey }
   }, [])
 
   useEffect(() => {
-    if (!speechSupported) return undefined
+    if (!nativeSpeechSupported) return undefined
     const loadVoices = () => { availableVoicesRef.current = window.speechSynthesis.getVoices() }
     loadVoices()
     window.speechSynthesis.addEventListener("voiceschanged", loadVoices)
     return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices)
-  }, [speechSupported])
+  }, [nativeSpeechSupported])
 
   const stopSpeaking = useCallback(() => {
-    if (!speechSupported) return
-    window.speechSynthesis.cancel()
-    setIsSpeaking(false)
-  }, [speechSupported])
+    speechRequestRef.current?.abort()
+    speechRequestRef.current = null
+    const audio = playbackAudioRef.current
+    playbackAudioRef.current = null
+    if (audio) {
+      audio.onended = null
+      audio.onerror = null
+      audio.pause()
+      audio.removeAttribute("src")
+    }
+    if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current)
+    playbackUrlRef.current = ""
+    if (nativeSpeechSupported) window.speechSynthesis.cancel()
+    if (mountedRef.current) setIsSpeaking(false)
+  }, [nativeSpeechSupported])
 
-  const speak = useCallback((text) => {
+  const speak = useCallback(async (text) => {
     if (!speechSupported || !text?.trim()) return
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(textForSpeech(text))
+    stopSpeaking()
+    const spokenText = prepareTextForSpeech(text)
+    const speechLanguage = language || navigator.language || "en-US"
+
+    if (cloudSpeechSupported && speechLanguage.toLowerCase().startsWith("en")) {
+      const controller = new AbortController()
+      speechRequestRef.current = controller
+      setIsSpeaking(true)
+      try {
+        const blob = await synthesizeSpeech(spokenText, controller.signal)
+        if (controller.signal.aborted) return
+        speechRequestRef.current = null
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio(url)
+        playbackUrlRef.current = url
+        playbackAudioRef.current = audio
+        const finish = () => {
+          if (playbackAudioRef.current !== audio) return
+          playbackAudioRef.current = null
+          playbackUrlRef.current = ""
+          URL.revokeObjectURL(url)
+          if (mountedRef.current) setIsSpeaking(false)
+        }
+        audio.onended = finish
+        audio.onerror = finish
+        await audio.play()
+        return
+      } catch (error) {
+        if (error.name === "AbortError") return
+        speechRequestRef.current = null
+        if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current)
+        playbackUrlRef.current = ""
+        playbackAudioRef.current = null
+      }
+    }
+
+    if (!nativeSpeechSupported) {
+      if (mountedRef.current) setIsSpeaking(false)
+      return
+    }
+    const utterance = new SpeechSynthesisUtterance(spokenText)
     const voices = availableVoicesRef.current.length
       ? availableVoicesRef.current
       : window.speechSynthesis.getVoices()
-    const speechLanguage = language || navigator.language || "en-US"
     utterance.voice = selectElegantFemaleVoice(voices, speechLanguage)
     utterance.lang = utterance.voice?.lang || speechLanguage
-    utterance.rate = 0.92
-    utterance.pitch = 1.08
-    utterance.volume = 0.96
+    utterance.rate = SMOOTH_SPEECH_SETTINGS.rate
+    utterance.pitch = SMOOTH_SPEECH_SETTINGS.pitch
+    utterance.volume = SMOOTH_SPEECH_SETTINGS.volume
     utterance.onstart = () => setIsSpeaking(true)
     utterance.onend = () => setIsSpeaking(false)
     utterance.onerror = () => setIsSpeaking(false)
     window.speechSynthesis.speak(utterance)
-  }, [language, speechSupported])
+  }, [cloudSpeechSupported, language, nativeSpeechSupported, speechSupported, stopSpeaking])
 
   const releaseRecordingStream = useCallback(() => {
     if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current)
     recordingTimerRef.current = null
+    voiceDetectionCleanupRef.current?.()
+    voiceDetectionCleanupRef.current = null
     streamRef.current?.getTracks().forEach(track => track.stop())
     streamRef.current = null
     if (mountedRef.current) setMediaStream(null)
+  }, [])
+
+  const detectEndOfSpeech = useCallback((stream, recorder) => {
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    if (!AudioContext) return
+
+    try {
+      const audioContext = new AudioContext()
+      const analyser = audioContext.createAnalyser()
+      const source = audioContext.createMediaStreamSource(stream)
+      const samples = new Uint8Array(analyser.fftSize)
+      let detector = { speechDetected: false, lastSpeechAt: 0, shouldStop: false }
+      let frameId
+
+      analyser.fftSize = 2_048
+      analyser.smoothingTimeConstant = 0.2
+      source.connect(analyser)
+      if (audioContext.state === "suspended") void audioContext.resume().catch(() => {})
+
+      const measure = now => {
+        analyser.getByteTimeDomainData(samples)
+        let energy = 0
+        for (const sample of samples) {
+          const amplitude = (sample - 128) / 128
+          energy += amplitude * amplitude
+        }
+        const level = Math.sqrt(energy / samples.length)
+        detector = updateSpeechEndDetector(detector, level, now)
+
+        if (detector.shouldStop) {
+          if (recorder.state === "recording") recorder.stop()
+          return
+        }
+        frameId = window.requestAnimationFrame(measure)
+      }
+
+      frameId = window.requestAnimationFrame(measure)
+      voiceDetectionCleanupRef.current = () => {
+        window.cancelAnimationFrame(frameId)
+        source.disconnect()
+        if (audioContext.state !== "closed") void audioContext.close()
+      }
+    } catch {
+      // Manual stop and the recording time limit remain available when audio analysis fails.
+    }
   }, [])
 
   const finishRecording = useCallback(async recorder => {
@@ -226,6 +324,7 @@ export function useVoiceInteraction({ onTranscript, onSubmit, disabled, apiKey }
       }
       recorder.onstop = () => { void finishRecording(recorder) }
       recorder.start(250)
+      detectEndOfSpeech(stream, recorder)
       setIsListening(true)
       recordingTimerRef.current = setTimeout(() => {
         if (recorder.state === "recording") recorder.stop()
@@ -237,7 +336,7 @@ export function useVoiceInteraction({ onTranscript, onSubmit, disabled, apiKey }
     } finally {
       startingRef.current = false
     }
-  }, [Recorder, finishRecording, releaseRecordingStream])
+  }, [Recorder, detectEndOfSpeech, finishRecording, releaseRecordingStream])
 
   useEffect(() => {
     if (!Recognition) return undefined
@@ -315,6 +414,7 @@ export function useVoiceInteraction({ onTranscript, onSubmit, disabled, apiKey }
 
   useEffect(() => () => {
     mountedRef.current = false
+    stopSpeaking()
     transcriptionControllerRef.current?.abort()
     const recorder = recorderRef.current
     if (recorder && recorder.state !== "inactive") {
@@ -322,7 +422,7 @@ export function useVoiceInteraction({ onTranscript, onSubmit, disabled, apiKey }
       recorder.stop()
     }
     releaseRecordingStream()
-  }, [releaseRecordingStream])
+  }, [releaseRecordingStream, stopSpeaking])
 
   return {
     recognitionSupported,

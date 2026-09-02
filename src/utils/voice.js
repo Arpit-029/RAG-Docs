@@ -13,6 +13,12 @@ export const VOICE_LANGUAGES = [
   { value: "ur", label: "Urdu" },
 ]
 
+export const SMOOTH_SPEECH_SETTINGS = Object.freeze({
+  rate: 0.88,
+  pitch: 1,
+  volume: 1,
+})
+
 const RECOGNITION_ERRORS = {
   "not-allowed": "Microphone access is blocked. Allow it in your browser settings and try again.",
   "service-not-allowed": "Speech recognition is disabled by this browser or device. Try the reliable recording mode again.",
@@ -51,4 +57,35 @@ export function preferredAudioMimeType(MediaRecorderClass) {
 
 export function normalizeVoiceLanguage(language) {
   return VOICE_LANGUAGES.some(option => option.value === language) ? language : ""
+}
+
+export function prepareTextForSpeech(text = "") {
+  return text
+    .replace(/\[(?:S\d+,\s*)?p\.\s*\d+\]/gi, "")
+    .replace(/\[([^\]]+)]\([^)]+\)/g, "$1")
+    .replace(/\r\n?/g, "\n")
+    .replace(/^[\t ]*(?:#{1,6}|[-*+>]|\d+[.)])[\t ]+/gm, "")
+    .replace(/\n{2,}/g, ". ")
+    .replace(/\n/g, ", ")
+    .replace(/[`*_]/g, "")
+    .replace(/\s+([,.;!?])/g, "$1")
+    .replace(/\.\s*\./g, ".")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+export function updateSpeechEndDetector(
+  detector,
+  level,
+  now,
+  { speechThreshold = 0.025, silenceMs = 1_600 } = {},
+) {
+  if (level >= speechThreshold) {
+    return { speechDetected: true, lastSpeechAt: now, shouldStop: false }
+  }
+
+  return {
+    ...detector,
+    shouldStop: detector.speechDetected && now - detector.lastSpeechAt >= silenceMs,
+  }
 }

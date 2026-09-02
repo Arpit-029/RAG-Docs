@@ -246,7 +246,7 @@ export default function VoiceOrb({ state, disabled, onClick, mediaStream }) {
 
   const labels = {
     idle: "Start listening",
-    listening: "Stop listening and ask",
+    listening: "Listening; submits after you pause",
     thinking: "Finding an answer",
     speaking: "Stop speaking",
     upload: "Upload a PDF",

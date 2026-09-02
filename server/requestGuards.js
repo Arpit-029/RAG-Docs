@@ -1,6 +1,7 @@
 export const MAX_CHAT_MESSAGES = 12
 export const MAX_MESSAGE_CHARACTERS = 60_000
 export const MAX_TOTAL_CHARACTERS = 120_000
+export const MAX_SPEECH_CHARACTERS = 5_000
 
 export function validateChatMessages(messages) {
   if (!Array.isArray(messages) || !messages.length || messages.length > MAX_CHAT_MESSAGES) return false
@@ -18,6 +19,10 @@ export function validateChatMessages(messages) {
 export function estimateTokens(messages, maxTokens) {
   const characters = messages.reduce((total, message) => total + message.content.length, 0)
   return Math.ceil(characters / 4) + maxTokens
+}
+
+export function validateSpeechText(text) {
+  return typeof text === "string" && text.trim().length > 0 && text.length <= MAX_SPEECH_CHARACTERS
 }
 
 export function requestOriginAllowed(request) {
