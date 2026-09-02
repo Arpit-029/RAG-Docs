@@ -32,6 +32,25 @@ export default function DocumentChatPage(props) {
     apiKey: props.apiKey,
   })
 
+  useEffect(() => {
+    const viewport = window.visualViewport
+
+    function syncViewportHeight() {
+      const height = viewport?.height ?? window.innerHeight
+      document.documentElement.style.setProperty("--app-height", `${Math.round(height)}px`)
+    }
+
+    syncViewportHeight()
+    viewport?.addEventListener("resize", syncViewportHeight)
+    window.addEventListener("resize", syncViewportHeight)
+
+    return () => {
+      viewport?.removeEventListener("resize", syncViewportHeight)
+      window.removeEventListener("resize", syncViewportHeight)
+      document.documentElement.style.removeProperty("--app-height")
+    }
+  }, [])
+
   const latestAssistantMessage = [...messages].reverse().find(message => message.role === "assistant")
   const hasConversation = messages.length > 0 || loading || followUpQuestions.length > 0
   const speakAnswer = voice.speak

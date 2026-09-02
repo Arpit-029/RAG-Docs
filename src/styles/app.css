@@ -100,10 +100,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, [role="button"]
   padding-top: clamp(34px, 6vh, 72px);
 }
 .voice-layout.empty { grid-template-columns: minmax(290px, 390px); justify-content: center; }
-.document-active-page { height: 100dvh; min-height: 100dvh; overflow: hidden; }
+.document-active-page { height: var(--app-height, 100dvh); min-height: var(--app-height, 100dvh); overflow: hidden; }
 .app.document-active {
   display: grid;
-  height: 100dvh;
+  height: var(--app-height, 100dvh);
   min-height: 0;
   grid-template-rows: 48px minmax(0, 1fr);
   overflow: hidden;
@@ -585,10 +585,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, [role="button"]
   .text-input { min-height: 44px; font-size: 16px; }
   .suggestion-chip { min-height: 44px; }
   .input-bar { position: sticky; z-index: 10; bottom: max(8px, env(safe-area-inset-bottom)); margin: 0; }
-  .document-active-page { height: 100dvh; min-height: 100dvh; overflow: hidden; }
+  .document-active-page { height: var(--app-height, 100dvh); min-height: var(--app-height, 100dvh); overflow: hidden; }
   .app.document-active {
     display: grid;
-    height: 100dvh;
+    height: var(--app-height, 100dvh);
     min-height: 0;
     grid-template-rows: 48px minmax(0, 1fr);
     padding-bottom: max(8px, env(safe-area-inset-bottom));
@@ -623,6 +623,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, [role="button"]
   .document-active:not(.has-conversation) .chat { padding: 0; overflow: hidden; }
   .document-active .composer-suggestions { margin-right: 0; margin-left: 0; }
   .document-active .input-bar { position: static; margin: 0; }
+  .document-active:has(.text-input:focus) .voice-layout { grid-template-rows: 0 minmax(0, 1fr); }
+  .document-active:has(.text-input:focus) .voice-stage { overflow: hidden; visibility: hidden; }
 }
 
 @media (max-width: 390px) {
