@@ -15,7 +15,11 @@ function canFailOver(status) {
   return [400, 403, 404, 408, 409, 410, 422, 429].includes(status) || status >= 500
 }
 
-async function getAvailableModels(key, refresh = false) {
+function isAbortError(error) {
+  return error?.name === "AbortError"
+}
+
+async function getAvailableModels(key, refresh = false, signal) {
   if (cachedKey !== key || refresh) {
     cachedKey = key
     cachedModels = null
@@ -25,6 +29,7 @@ async function getAvailableModels(key, refresh = false) {
   try {
     const response = await fetch("https://api.groq.com/openai/v1/models", {
       headers: { Authorization: `Bearer ${key}` },
+      signal,
     })
     const data = await response.json()
     const available = data.data?.map(model => model.id).filter(isChatModel) || []
@@ -35,7 +40,8 @@ async function getAvailableModels(key, refresh = false) {
       ]
       return cachedModels
     }
-  } catch {
+  } catch (error) {
+    if (isAbortError(error)) throw error
     // Probe known models when discovery is temporarily unavailable.
   }
 
@@ -50,11 +56,13 @@ export async function getAvailableModel(key) {
 export async function callGroq(key, messages, maxTokens = 1500, options = {}) {
   const quality = options.quality || "high"
   const reasoningEffort = options.reasoningEffort || "medium"
+  const signal = options.signal
   if (key === MANAGED_GROQ_KEY) {
     const response = await fetch("/api/groq", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages, maxTokens, quality, reasoningEffort }),
+      signal,
     })
     const data = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(data.error?.message || `API error ${response.status}`)
@@ -65,7 +73,7 @@ export async function callGroq(key, messages, maxTokens = 1500, options = {}) {
   const attemptedModels = new Set()
   let lastError = "No accessible Groq model is available."
   for (let pass = 0; pass < 2; pass += 1) {
-    for (const model of await getAvailableModels(key, pass === 1)) {
+    for (const model of await getAvailableModels(key, pass === 1, signal)) {
       if (attemptedModels.has(model)) continue
       attemptedModels.add(model)
 
@@ -75,6 +83,7 @@ export async function callGroq(key, messages, maxTokens = 1500, options = {}) {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
           body: JSON.stringify({ model, messages, temperature: 0.2, max_tokens: maxTokens, ...modelOptions }),
+          signal,
         })
         const data = await response.json().catch(() => ({}))
         if (response.ok) return data.choices?.[0]?.message?.content || ""
@@ -86,6 +95,7 @@ export async function callGroq(key, messages, maxTokens = 1500, options = {}) {
           throw terminalError
         }
       } catch (error) {
+        if (isAbortError(error)) throw error
         if (error.stopFailover) throw error
         lastError = error.message || lastError
       }

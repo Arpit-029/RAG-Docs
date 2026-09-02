@@ -20,13 +20,13 @@ The product combines a voice-first question flow with page-aware document eviden
 
 ## Operating Context
 
-The primary workflow is: upload a PDF, wait for document processing, press the central microphone, ask a question while the live transcript appears, then let the question submit automatically when speech ends. The learner can read or listen to the answer. Typing remains available when voice input is unavailable or inconvenient.
+The primary workflow is: upload a PDF, wait for document processing, press the central microphone, ask a question, then let the recorded question transcribe and submit automatically when speech ends. The learner can read or listen to the answer. Typing remains available when voice input is unavailable or inconvenient.
 
 ## Capabilities and Constraints
 
 - PDF text extraction and page-aware source retrieval already run in the browser.
 - Groq generates grounded answers through an existing server proxy or a user-supplied key.
-- The first voice release uses browser speech recognition and speech synthesis; support and voice quality depend on the browser and operating system.
+- Voice questions use browser audio recording with Groq transcription, falling back to browser speech recognition only when recording is unavailable. Spoken answers use browser speech synthesis.
 - The first release does not include continuous calling, accounts, progress tracking, semantic embeddings, or OCR for image-only PDFs.
 
 ## Brand Commitments

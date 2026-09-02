@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from "react"
 import { modePrompts } from "../constants/chatModes"
 import { callGroq, MANAGED_GROQ_KEY } from "../services/groq"
+import { loadActiveDocument, saveActiveDocument } from "../services/documentStore"
 import { parsePdf } from "../services/pdf"
+import { isPdfFile, validatePdfFile } from "../utils/pdfLimits"
+import { createRequestGate } from "../utils/requestGate"
 import { getTopChunks, getTopChunksForQueries, chunkPages } from "../utils/documentSearch"
 import { buildAnswerMessages, buildFollowUpMessages, buildSearchPlanMessages, buildSummaryMessages } from "../utils/documentPrompts"
+
+const EMPTY_CONVERSATION = Object.freeze({ messages: [], followUpQuestions: [] })
 
 // Uses the deployment key first, then falls back to the key saved in this browser.
 export function resolveInitialKey() {
@@ -14,44 +19,76 @@ export function resolveInitialKey() {
 
 export function useDocMind() {
   // UI state is kept here so page and component files only render the interface.
-  const previewComposer = import.meta.env.DEV && new URLSearchParams(window.location.search).has("previewComposer")
-  const previewDocument = previewComposer
-    ? { name: "Universal_Delivery_Challan_Template.pdf", chunks: [], pages: 1, summary: "Preview document" }
-    : null
   const [apiKey, setApiKey] = useState(resolveInitialKey)
   const isManagedKey = apiKey === MANAGED_GROQ_KEY
   const [keyDraft, setKeyDraft] = useState("")
-  const [documents, setDocuments] = useState(() => previewDocument ? [previewDocument] : [])
-  const [activeDocumentName, setActiveDocumentName] = useState(previewDocument?.name || null)
-  const [messages, setMessages] = useState(() => previewComposer ? [
-    { role: "assistant", content: "The delivery challan records the recipient, delivery date, and item details." },
-  ] : [])
+  const [documents, setDocuments] = useState([])
+  const [activeDocumentName, setActiveDocumentName] = useState(null)
+  const [conversationsByDocument, setConversationsByDocument] = useState({})
   const [inputValue, setInputValue] = useState("")
   const [mode, setMode] = useState("Chat")
   const [loading, setLoading] = useState(false)
   const [indexing, setIndexing] = useState(false)
+  const [restoringDocument, setRestoringDocument] = useState(true)
+  const [processingDocument, setProcessingDocument] = useState(null)
   const [showSources, setShowSources] = useState(false)
   const [showSummary, setShowSummary] = useState(false)
-  const [followUpQuestions, setFollowUpQuestions] = useState(() => previewComposer ? [
-    "What fields are required on the delivery challan?",
-    "How should the delivery date be formatted?",
-    "Where should signatures be added?",
-  ] : [])
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef(null)
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
+  const answerGateRef = useRef(createRequestGate())
+  const followUpGateRef = useRef(createRequestGate())
 
   const activeDocument = documents.find(document => document.name === activeDocumentName)
+  const activeConversation = conversationsByDocument[activeDocumentName] || EMPTY_CONVERSATION
+  const messages = activeConversation.messages
+  const followUpQuestions = activeConversation.followUpQuestions
+
+  useEffect(() => {
+    let cancelled = false
+
+    loadActiveDocument()
+      .then(document => {
+        if (cancelled || !document) return
+        setDocuments([document])
+        setActiveDocumentName(document.name)
+      })
+      .catch(error => console.error("Failed to restore the saved PDF", error))
+      .finally(() => {
+        if (!cancelled) setRestoringDocument(false)
+      })
+
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     // Keep the latest reply visible as new messages arrive.
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, loading])
 
-  function clearChat() {
-    setMessages([])
-    setFollowUpQuestions([])
+  useEffect(() => () => {
+    answerGateRef.current.cancel()
+    followUpGateRef.current.cancel()
+  }, [])
+
+  function updateConversation(documentName, update) {
+    if (!documentName) return
+    setConversationsByDocument(previous => {
+      const current = previous[documentName] || EMPTY_CONVERSATION
+      return { ...previous, [documentName]: update(current) }
+    })
+  }
+
+  function cancelPendingRequests() {
+    answerGateRef.current.cancel()
+    followUpGateRef.current.cancel()
+  }
+
+  function clearChat(documentName = activeDocumentName) {
+    cancelPendingRequests()
+    setLoading(false)
+    updateConversation(documentName, () => EMPTY_CONVERSATION)
   }
 
   function saveKey() {
@@ -72,69 +109,84 @@ export function useDocMind() {
   }
 
   function selectDocument(name) {
+    cancelPendingRequests()
+    setLoading(false)
     setActiveDocumentName(name)
-    clearChat()
   }
 
   async function processFiles(files) {
+    if (restoringDocument || indexing) return
     if (!apiKey) {
       alert("Add your Groq API key first")
       return
     }
 
     // Ignore files that are not PDFs because the parser only supports PDFs.
-    const pdfFiles = Array.from(files).filter(file => file.type === "application/pdf")
-    if (!pdfFiles.length) return
-
-    setIndexing(true)
-    for (const file of pdfFiles) {
-      if (documents.find(document => document.name === file.name)) continue
-
-      try {
-        const { pageTexts, pages } = await parsePdf(file)
-        const chunks = chunkPages(pageTexts)
-        if (!chunks.length) throw new Error("No readable text was found in this PDF.")
-
-        // Representative excerpts make summaries useful for the whole document,
-        // rather than only its opening pages.
-        const summarySources = getTopChunks(chunks, "summary overview main topics", 8)
-        const summary = await callGroq(apiKey, buildSummaryMessages(file.name, summarySources), 650, {
-          quality: "high",
-          reasoningEffort: "medium",
-        })
-
-        setDocuments(previousDocuments => [...previousDocuments, {
-          name: file.name,
-          chunks,
-          pages,
-          summary,
-        }])
-        setActiveDocumentName(file.name)
-        clearChat()
-      } catch (error) {
-        alert(`Failed to process ${file.name}: ${error.message}`)
-        console.error(error)
-      }
+    const file = Array.from(files).find(isPdfFile)
+    if (!file) {
+      alert("Choose a PDF file.")
+      return
     }
+    try {
+      validatePdfFile(file)
+    } catch (error) {
+      alert(error.message)
+      return
+    }
+
+    cancelPendingRequests()
+    setLoading(false)
+    setIndexing(true)
+    try {
+      setProcessingDocument({ name: file.name, stage: "reading" })
+      const { pageTexts, pages } = await parsePdf(file)
+      setProcessingDocument({ name: file.name, stage: "extracting" })
+      const chunks = chunkPages(pageTexts)
+      if (!chunks.length) throw new Error("No readable text was found in this PDF.")
+
+      // Representative excerpts make summaries useful for the whole document,
+      // rather than only its opening pages.
+      const summarySources = getTopChunks(chunks, "summary overview main topics", 8)
+      setProcessingDocument({ name: file.name, stage: "preparing" })
+      const summary = await callGroq(apiKey, buildSummaryMessages(file.name, summarySources), 650, {
+        quality: "high",
+        reasoningEffort: "medium",
+      })
+      const document = { name: file.name, chunks, pages, summary }
+
+      // Persist first so a failed replacement never discards the previous PDF.
+      await saveActiveDocument(document)
+      setDocuments([document])
+      setActiveDocumentName(file.name)
+      clearChat(file.name)
+    } catch (error) {
+      alert(`Failed to process ${file.name}: ${error.message}`)
+      console.error(error)
+    }
+    setProcessingDocument(null)
     setIndexing(false)
   }
 
   async function sendMessage(text) {
     if (!text?.trim() || loading || !activeDocument) return
 
+    const documentName = activeDocumentName
+    const document = activeDocument
     const userMessage = { role: "user", content: text }
     const conversation = [...messages, userMessage]
-    setMessages(conversation)
+    updateConversation(documentName, () => ({ messages: conversation, followUpQuestions: [] }))
     setInputValue("")
-    setFollowUpQuestions([])
+    followUpGateRef.current.cancel()
+    const request = answerGateRef.current.begin()
     setLoading(true)
 
     try {
       const priorConversation = conversation.slice(0, -1)
-      const searchQueries = await planSearchQueries(apiKey, activeDocumentName, priorConversation, text)
-      const sourceChunks = getTopChunksForQueries(activeDocument.chunks, searchQueries)
+      const searchQueries = await planSearchQueries(apiKey, documentName, priorConversation, text, request.signal)
+      if (!answerGateRef.current.isCurrent(request.id)) return
+      const sourceChunks = getTopChunksForQueries(document.chunks, searchQueries)
       const answerMessages = buildAnswerMessages({
-        documentName: activeDocumentName,
+        documentName,
         modePrompt: modePrompts[mode],
         conversation: priorConversation,
         question: text,
@@ -144,59 +196,75 @@ export function useDocMind() {
       const reply = await callGroq(apiKey, answerMessages, maxTokens, {
         quality: "high",
         reasoningEffort: mode === "Deep" ? "high" : "medium",
+        signal: request.signal,
       })
+      if (!answerGateRef.current.isCurrent(request.id)) return
 
-      setMessages(previousMessages => [...previousMessages, {
-        role: "assistant",
-        content: reply,
-        sources: sourceChunks,
-      }])
-      loadFollowUpQuestions(text, reply)
+      updateConversation(documentName, previous => ({
+        ...previous,
+        messages: [...previous.messages, { role: "assistant", content: reply, sources: sourceChunks }],
+      }))
+      loadFollowUpQuestions(documentName, text, reply)
     } catch (error) {
-      setMessages(previousMessages => [...previousMessages, {
-        role: "assistant",
-        content: `I couldn't complete that request. ${error.message}`,
-      }])
+      if (error.name !== "AbortError" && answerGateRef.current.isCurrent(request.id)) {
+        updateConversation(documentName, previous => ({
+          ...previous,
+          messages: [...previous.messages, { role: "assistant", content: `I couldn't complete that request. ${error.message}` }],
+        }))
+      }
+    } finally {
+      const isCurrent = answerGateRef.current.isCurrent(request.id)
+      answerGateRef.current.finish(request.id)
+      if (isCurrent) {
+        setLoading(false)
+        setTimeout(() => inputRef.current?.focus(), 100)
+      }
     }
-
-    setLoading(false)
-    setTimeout(() => inputRef.current?.focus(), 100)
   }
 
-  function loadFollowUpQuestions(question, reply) {
+  function loadFollowUpQuestions(documentName, question, reply) {
     // Follow-ups are optional, so a failure here must not interrupt the chat.
-    callGroq(apiKey, buildFollowUpMessages(activeDocumentName, question, reply), 180, {
+    const request = followUpGateRef.current.begin()
+    callGroq(apiKey, buildFollowUpMessages(documentName, question, reply), 180, {
       quality: "fast",
       reasoningEffort: "low",
+      signal: request.signal,
     })
       .then(rawResponse => {
+        if (!followUpGateRef.current.isCurrent(request.id)) return
         try {
           const questions = JSON.parse(rawResponse.slice(rawResponse.indexOf("["), rawResponse.lastIndexOf("]") + 1))
-          if (Array.isArray(questions)) setFollowUpQuestions(questions.filter(question => typeof question === "string").slice(0, 3))
+          if (Array.isArray(questions)) {
+            updateConversation(documentName, previous => ({
+              ...previous,
+              followUpQuestions: questions.filter(question => typeof question === "string").slice(0, 3),
+            }))
+          }
         } catch {
           // The response was not a valid JSON array, so do not show follow-ups.
         }
       })
       .catch(() => {})
+      .finally(() => followUpGateRef.current.finish(request.id))
   }
 
   return {
     apiKey, isManagedKey, keyDraft, setKeyDraft, saveKey, resetKey,
     documents, activeDocumentName, activeDocument, selectDocument,
-    messages, inputValue, setInputValue, mode, setMode, loading, indexing,
+    messages, inputValue, setInputValue, mode, setMode, loading, indexing, restoringDocument, processingDocument,
     showSources, setShowSources, showSummary, setShowSummary,
     followUpQuestions, dragActive, setDragActive, processFiles, sendMessage, clearChat,
     fileInputRef, bottomRef, inputRef,
   }
 }
 
-async function planSearchQueries(apiKey, documentName, conversation, question) {
+async function planSearchQueries(apiKey, documentName, conversation, question, signal) {
   try {
     const rawResponse = await callGroq(
       apiKey,
       buildSearchPlanMessages(documentName, conversation, question),
       180,
-      { quality: "fast", reasoningEffort: "low" },
+      { quality: "fast", reasoningEffort: "low", signal },
     )
     const json = rawResponse.slice(rawResponse.indexOf("{"), rawResponse.lastIndexOf("}") + 1)
     const parsed = JSON.parse(json)
@@ -204,7 +272,8 @@ async function planSearchQueries(apiKey, documentName, conversation, question) {
       ? parsed.queries.filter(query => typeof query === "string" && query.trim()).map(query => query.trim())
       : []
     return [...new Set([question.trim(), ...generatedQueries])].slice(0, 4)
-  } catch {
+  } catch (error) {
+    if (error.name === "AbortError") throw error
     // Search planning improves difficult questions, but basic retrieval remains
     // available if the utility request is rate-limited or malformed.
     return [question.trim()]

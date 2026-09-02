@@ -1,6 +1,5 @@
 import { useEffect, useRef } from "react"
 import { Mesh, Program, Renderer, Triangle, Vec3 } from "ogl"
-import AppIcon from "./AppIcon"
 
 const vertexShader = /* glsl */ `
   precision highp float;
@@ -96,7 +95,7 @@ const fragmentShader = /* glsl */ `
   }
 `
 
-export default function VoiceOrb({ state, disabled, onClick }) {
+export default function VoiceOrb({ state, disabled, onClick, mediaStream }) {
   const containerRef = useRef(null)
   const stateRef = useRef(state)
   const analyserRef = useRef(null)
@@ -105,37 +104,27 @@ export default function VoiceOrb({ state, disabled, onClick }) {
   stateRef.current = state
 
   useEffect(() => {
-    if (state !== "listening" || !navigator.mediaDevices?.getUserMedia) {
+    if (state !== "listening" || !mediaStream) {
       analyserRef.current = null
       frequencyDataRef.current = null
       return undefined
     }
 
     let cancelled = false
-    let stream
     let audioContext
     let source
 
     async function connectVoiceMeter() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-          },
-        })
-        if (cancelled) {
-          stream.getTracks().forEach(track => track.stop())
-          return
-        }
+        if (cancelled) return
         const AudioContext = window.AudioContext || window.webkitAudioContext
+        if (!AudioContext) return
         audioContext = new AudioContext()
         if (audioContext.state === "suspended") await audioContext.resume()
         const analyser = audioContext.createAnalyser()
         analyser.fftSize = 256
         analyser.smoothingTimeConstant = 0.45
-        source = audioContext.createMediaStreamSource(stream)
+        source = audioContext.createMediaStreamSource(mediaStream)
         source.connect(analyser)
         analyserRef.current = analyser
         frequencyDataRef.current = new Uint8Array(analyser.frequencyBinCount)
@@ -150,10 +139,9 @@ export default function VoiceOrb({ state, disabled, onClick }) {
       analyserRef.current = null
       frequencyDataRef.current = null
       source?.disconnect()
-      stream?.getTracks().forEach(track => track.stop())
       if (audioContext && audioContext.state !== "closed") audioContext.close()
     }
-  }, [state])
+  }, [mediaStream, state])
 
   useEffect(() => {
     const container = containerRef.current
@@ -270,9 +258,7 @@ export default function VoiceOrb({ state, disabled, onClick }) {
     aria-label={labels[state] || labels.idle}
   >
     <span className="orb-halo" />
-    <span className="orb-ring" />
     <span className="orb-fallback" />
     <span ref={containerRef} className="orb-canvas" aria-hidden="true" />
-    <span className="orb-glyph"><AppIcon name={state === "speaking" ? "stop" : state === "upload" ? "document" : "mic"} size={28} /></span>
   </button>
 }

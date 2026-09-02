@@ -1,25 +1,14 @@
 // Shows every chat state: empty state, messages, loading state, and follow-ups.
 import AppIcon from "./AppIcon"
-import BrandMark from "./BrandMark"
 
-export default function ChatConversation({ document, messages, loading, showSources, bottomRef, onSpeak, onStopSpeaking, isSpeaking }) {
+export default function ChatConversation({ messages, loading, showSources, bottomRef, onSpeak, onStopSpeaking, isSpeaking }) {
   return <section className="chat">
-    {!document && <EmptyState>Upload a PDF above to start chatting.</EmptyState>}
-    {document && messages.length === 0 && <EmptyState />}
-
     {messages.map((message, index) => <Message key={index} message={message} showSources={showSources} onSpeak={onSpeak} onStopSpeaking={onStopSpeaking} isSpeaking={isSpeaking && index === messages.length - 1} />)}
 
     {loading && <div className="message-row assistant"><div className="message assistant"><span className="typing">Loading...</span></div></div>}
 
     <div ref={bottomRef} />
   </section>
-}
-
-function EmptyState({ children }) {
-  return <div className="empty-state">
-    <BrandMark className="empty-state-brand" />
-    {children && <div>{children}</div>}
-  </div>
 }
 
 function Message({ message, showSources, onSpeak, onStopSpeaking, isSpeaking }) {

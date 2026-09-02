@@ -1,6 +1,6 @@
 import AppIcon from "./AppIcon"
 
-export default function MessageInput({ inputRef, value, onChange, onSend, loading, listening, onVoiceToggle, suggestions = [], onSuggestion }) {
+export default function MessageInput({ inputRef, value, onChange, onSend, loading, listening, transcribing, onVoiceToggle, suggestions = [], onSuggestion }) {
   function handleKeyDown(event) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
@@ -14,7 +14,7 @@ export default function MessageInput({ inputRef, value, onChange, onSend, loadin
     </div>}
     <div className="input-bar">
       <input ref={inputRef} className="text-input" value={value} onChange={event => onChange(event.target.value)} onKeyDown={handleKeyDown} placeholder="Ask anything in this PDF..." disabled={loading} aria-label="Question" />
-      <button type="button" className={`input-action mic-button ${listening ? "active" : ""}`} onClick={onVoiceToggle} disabled={loading} aria-label={listening ? "Stop listening and ask" : "Start listening"}><AppIcon name="mic" size={20} /></button>
+      <button type="button" className={`input-action mic-button ${listening ? "active" : ""}`} onClick={onVoiceToggle} disabled={loading || transcribing} aria-label={transcribing ? "Transcribing voice" : listening ? "Stop listening and ask" : "Start listening"}><AppIcon name="mic" size={20} /></button>
       <button type="button" className="primary-button send-button" onClick={() => onSend(value)} disabled={loading || !value.trim()} aria-label="Send question"><AppIcon name="send" size={19} /></button>
     </div>
   </div>

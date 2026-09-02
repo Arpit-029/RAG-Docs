@@ -18,7 +18,7 @@ FORM: Operate-mode voice console, directly pinned by the user's supplied mobile 
 export default function DocumentChatPage(props) {
   const {
     resetKey, isManagedKey, documents, activeDocumentName, activeDocument, selectDocument,
-    indexing, dragActive, setDragActive, fileInputRef, processFiles,
+    indexing, restoringDocument, processingDocument, dragActive, setDragActive, fileInputRef, processFiles,
     mode, setMode, showSources, setShowSources, showSummary, setShowSummary,
     clearChat, messages, followUpQuestions, sendMessage, bottomRef,
     inputRef, inputValue, setInputValue, loading,
@@ -29,9 +29,12 @@ export default function DocumentChatPage(props) {
     onTranscript: setInputValue,
     onSubmit: sendMessage,
     disabled: loading || indexing || !activeDocument,
+    apiKey: props.apiKey,
   })
 
   const latestAssistantMessage = [...messages].reverse().find(message => message.role === "assistant")
+  const hasConversation = messages.length > 0 || loading || followUpQuestions.length > 0
+  const speakAnswer = voice.speak
 
   useEffect(() => {
     if (!latestAssistantMessage) {
@@ -40,13 +43,38 @@ export default function DocumentChatPage(props) {
     }
     if (!loading && latestAssistantMessage !== lastSpokenMessageRef.current) {
       lastSpokenMessageRef.current = latestAssistantMessage
-      voice.speak(latestAssistantMessage.content)
+      speakAnswer(latestAssistantMessage.content)
     }
-  }, [latestAssistantMessage, loading, voice.speak])
+  }, [latestAssistantMessage, loading, speakAnswer])
 
-  const orbState = !activeDocument
+  useEffect(() => {
+    function dismissMenu(event) {
+      const menu = menuRef.current
+      if (!menu?.open) return
+
+      if (event.type === "keydown") {
+        if (event.key !== "Escape") return
+        menu.open = false
+        menu.querySelector("summary")?.focus()
+        return
+      }
+
+      if (!menu.contains(event.target)) menu.open = false
+    }
+
+    document.addEventListener("pointerdown", dismissMenu)
+    document.addEventListener("keydown", dismissMenu)
+    return () => {
+      document.removeEventListener("pointerdown", dismissMenu)
+      document.removeEventListener("keydown", dismissMenu)
+    }
+  }, [])
+
+  const orbState = restoringDocument
+    ? "thinking"
+    : !activeDocument
     ? "upload"
-    : loading || indexing
+    : loading || indexing || voice.isTranscribing
       ? "thinking"
       : voice.isListening
         ? "listening"
@@ -54,9 +82,13 @@ export default function DocumentChatPage(props) {
           ? "speaking"
           : "idle"
 
-  const status = indexing
+  const status = restoringDocument
+    ? "RESTORING DOCUMENT"
+    : indexing
     ? "READING DOCUMENT"
-    : loading
+    : voice.isTranscribing
+      ? "TRANSCRIBING"
+      : loading
       ? "FINDING ANSWER"
       : voice.isListening
         ? "LISTENING"
@@ -78,12 +110,8 @@ export default function DocumentChatPage(props) {
     voice.toggleListening()
   }
 
-  function openSettings() {
-    if (menuRef.current) menuRef.current.open = true
-  }
-
-  return <div className={`page ${activeDocument ? "document-active-page" : ""}`}><main className={`app ${activeDocument ? "document-active" : ""}`}>
-    <input ref={fileInputRef} type="file" accept=".pdf" multiple hidden onChange={event => processFiles(event.target.files)} />
+  return <div className={`page ${activeDocument ? "document-active-page" : ""} ${hasConversation ? "has-conversation" : ""}`}><main className={`app ${activeDocument ? "document-active" : ""} ${hasConversation ? "has-conversation" : ""}`}>
+    <input ref={fileInputRef} type="file" accept=".pdf" hidden disabled={restoringDocument || indexing} onChange={event => { processFiles(event.target.files); event.target.value = "" }} />
     <header className="header">
       <details className="utility-menu" ref={menuRef}>
         <summary className="round-control" aria-label="Open controls"><AppIcon name="menu" size={21} /></summary>
@@ -96,6 +124,9 @@ export default function DocumentChatPage(props) {
             onSourcesToggle={() => setShowSources(value => !value)}
             showSummary={showSummary}
             onSummaryToggle={() => setShowSummary(value => !value)}
+            voiceLanguage={voice.language}
+            voiceLanguages={voice.languages}
+            onVoiceLanguageChange={voice.setLanguage}
             onClear={clearChat}
             messages={messages}
             documentName={activeDocumentName}
@@ -113,12 +144,12 @@ export default function DocumentChatPage(props) {
         </div>
       </details>
       <BrandMark className="brand" />
-      <button type="button" className="round-control" onClick={() => fileInputRef.current?.click()} aria-label="Upload another PDF"><AppIcon name="document" size={21} /></button>
+      <button type="button" className="round-control" onClick={() => fileInputRef.current?.click()} disabled={restoringDocument || indexing} aria-label="Upload another PDF"><AppIcon name="document" size={21} /></button>
     </header>
 
     <div className={`voice-layout ${activeDocument ? "" : "empty"}`}>
       <section className="voice-stage" aria-labelledby="voice-heading">
-        <VoiceOrb state={orbState} disabled={loading || indexing} onClick={handleOrbClick} />
+        <VoiceOrb state={orbState} disabled={loading || indexing || restoringDocument || voice.isTranscribing} onClick={handleOrbClick} mediaStream={voice.mediaStream} />
         <div className="voice-copy">
           <h1 id="voice-heading">{activeDocument ? "Ask your document" : "Upload a document"}</h1>
           <p className={`voice-status ${orbState}`}><span />{status}</p>
@@ -126,8 +157,10 @@ export default function DocumentChatPage(props) {
 
         {voice.voiceError && <div className="voice-error" role="alert">{voice.voiceError}</div>}
 
-        {!activeDocument && <DocumentUploader
+        {(restoringDocument || indexing || !activeDocument) && <DocumentUploader
           indexing={indexing}
+          restoringDocument={restoringDocument}
+          processingDocument={processingDocument}
           dragActive={dragActive}
           fileInputRef={fileInputRef}
           onDragActiveChange={setDragActive}
@@ -143,7 +176,6 @@ export default function DocumentChatPage(props) {
         </section>}
 
         <ChatConversation
-          document={activeDocument}
           messages={messages}
           loading={loading}
           showSources={showSources}
@@ -160,19 +192,13 @@ export default function DocumentChatPage(props) {
           onSend={sendMessage}
           loading={loading}
           listening={voice.isListening}
+          transcribing={voice.isTranscribing}
           onVoiceToggle={voice.toggleListening}
           suggestions={followUpQuestions}
           onSuggestion={sendMessage}
         />}
       </section>}
     </div>
-
-    <nav className="bottom-nav" aria-label="Primary navigation">
-      <button type="button" className="active"><AppIcon name="home" /><span>Home</span></button>
-      <button type="button" onClick={() => fileInputRef.current?.click()}><AppIcon name="document" /><span>Documents</span></button>
-      <button type="button" onClick={() => inputRef.current?.focus()} disabled={!activeDocument}><AppIcon name="chat" /><span>Chat</span></button>
-      <button type="button" onClick={openSettings}><AppIcon name="settings" /><span>Settings</span></button>
-    </nav>
 
   </main></div>
 }

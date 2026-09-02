@@ -24,11 +24,11 @@ Use the system UI stack for reliable loading and clear document reading. The AEO
 
 ## Composition
 
-Before upload, the screen follows one vertical path from the orb to the uploader. After upload, the document becomes background context: header, orb, conversation, and composer share one continuous viewport without a document card or a boxed conversation section. On wider screens, the orb and conversation form two columns without changing the interaction order.
+Before upload, the screen follows one vertical path from the orb to the uploader. After upload and before the first question, the clean dome and prompt sit centered in the available frame with no empty-chat mark. Once a question, answer, loading state, or follow-up appears, the dome lifts into a compact top stage so the conversation can expand below it. The document remains background context without a document card or a boxed conversation section.
 
 ## Components
 
-- The orb is a real button and the dominant microphone control.
+- The orb is a real, centered button and the dominant voice control; it presents as a clean violet dome without an overlaid microphone symbol or outer ring line.
 - Surfaces use 14–16px radii, one subtle border, and offset soft shadows.
 - Small controls may be circular or pill-shaped; content containers are not pills.
 - Page citations are compact violet text chips and remain visible even when full excerpts are collapsed.
@@ -37,7 +37,7 @@ Before upload, the screen follows one vertical path from the orb to the uploader
 
 ## Motion
 
-The central orb is a bounded WebGL shader: its fluid violet surface responds to microphone energy while listening, accelerates while processing, and settles into a softer rhythm while speaking. The outer ring reinforces state without competing with the shader. Rendering pauses when the orb is offscreen or the page is hidden; motion stops under `prefers-reduced-motion`.
+The central orb is a bounded WebGL shader: its fluid violet surface responds to microphone energy while listening, accelerates while processing, and settles into a softer rhythm while speaking. Rendering pauses when the orb is offscreen or the page is hidden; motion stops under `prefers-reduced-motion`.
 
 ## Responsive Rules
 
